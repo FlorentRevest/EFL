@@ -58,6 +58,8 @@ typedef void (*Eina_Lock_Bt_Func) ();
 #include "eina_inlist.h"
 #endif
 
+#include "eina_inline_private.h"
+
 typedef struct _Eina_Lock Eina_Lock;
 typedef struct _Eina_RWLock Eina_RWLock;
 typedef struct _Eina_Condition Eina_Condition;
@@ -387,8 +389,9 @@ eina_condition_timedwait(Eina_Condition *cond, double t)
    pthread_mutex_unlock(&_eina_tracking_lock);
 #endif
 
-   tv.tv_sec = t;
-   tv.tv_nsec = (t - (double) tv.tv_sec) * 1000000000;
+   _eina_time_get(&tv);
+   tv.tv_sec += t;
+   tv.tv_nsec += (t - (double) tv.tv_sec) * 1000000000;
 
    r = pthread_cond_timedwait(&(cond->condition),
 			      &(cond->lock->mutex),
