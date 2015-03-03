@@ -24,13 +24,13 @@
 
 
 static inline void
-_ector_memfill(DATA32 *dest, uint value, int count)
+_ector_memfill(DATA32 *dest, int length, uint value)
 {
-    if (!count)
+    if (!length)
         return;
 
-    int n = (count + 7) / 8;
-    switch (count & 0x07)
+    int n = (length + 7) / 8;
+    switch (length & 0x07)
     {
     case 0: do { *dest++ = value;
     case 7:      *dest++ = value;
@@ -44,21 +44,44 @@ _ector_memfill(DATA32 *dest, uint value, int count)
     }
 }
 
+inline static void
+_ector_comp_func_solid_source_copy(uint *dest, int length, uint color, uint const_alpha)
+{
+   if (const_alpha == 255) _ector_memfill(dest, length, color);
+   else
+     {
+        int ialpha, i = 0;
+        uint c = ECTOR_MUL_256(color, const_alpha);
+        ialpha = 255 - const_alpha;
+        for (; i < length; ++i)
+          dest[i] = c + ECTOR_MUL_256(dest[i], ialpha);
+     }
+}
+
+inline static void
+_ector_comp_func_solid_source_blend(uint *dest, int length, uint color, uint const_alpha)
+{
+   int ialpha, i = 0;
+   uint c = ECTOR_MUL_256(color, const_alpha);
+   ialpha = (~c) >> 24;
+   for (; i < length; ++i)
+     dest[i] = c + ECTOR_MUL_256(dest[i], ialpha);
+}
 
 static inline void 
-_ector_comp_func_source_over_mul_c(uint *dest, uint *src, DATA32 c, int length, uint const_alpha)
+_ector_comp_func_source_over_c(uint *dest, const uint *src, int length, uint color, uint const_alpha)
 {
     if (const_alpha == 255) {
         for (int i = 0; i < length; ++i) {
             uint s = src[i];
-            DATA32 sc = ECTOR_MUL4_SYM(c, s);
+            DATA32 sc = ECTOR_MUL4_SYM(color, s);
             uint a = (~sc) >> 24;
             dest[i] = sc + ECTOR_MUL_256(dest[i], a);
         }
     } else {
         for (int i = 0; i < length; ++i) {
             uint s = src[i];
-            DATA32 sc = ECTOR_MUL4_SYM(c, s);
+            DATA32 sc = ECTOR_MUL4_SYM(color, s);
             sc = ECTOR_MUL_256(sc, const_alpha);
             uint a = (~sc) >> 24;
             dest[i] = sc + ECTOR_MUL_256(dest[i], a);
@@ -68,7 +91,7 @@ _ector_comp_func_source_over_mul_c(uint *dest, uint *src, DATA32 c, int length, 
 
 
 static inline void 
-_ector_comp_func_source_over(uint *dest, uint *src, int length, uint const_alpha)
+_ector_comp_func_source_over(uint *dest, const uint *src, int length, uint color EINA_UNUSED, uint const_alpha)
 {
     if (const_alpha == 255) {
         for (int i = 0; i < length; ++i) {

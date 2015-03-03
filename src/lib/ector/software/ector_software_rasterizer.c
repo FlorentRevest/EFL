@@ -10,47 +10,31 @@
 #include "ector_software_private.h"
 #include "ector_blend_private.h"
 
+
+typedef void (*ector_comp_func)(uint *dest, const uint *src, int length, uint mul_col, uint const_alpha);
+typedef void (*ector_comp_func_solid)(uint *dest, int length, uint color, uint const_alpha);
+
 static void
 _blend_color_argb(int count, const SW_FT_Span *spans, void *user_data)
 {
+   ector_comp_func_solid comp_func;
    Span_Data *data = (Span_Data *)(user_data);
 
    // multiply the color with mul_col if any
    uint color = ECTOR_MUL4_SYM(data->color, data->mul_col);
    Eina_Bool solid_source = ((color >> 24) == 255);
 
+   //@TODO, Get the proper composition function using ,color, ECTOR_OP etc.
+   if (solid_source) comp_func = &_ector_comp_func_solid_source_copy;
+   else comp_func = &_ector_comp_func_solid_source_blend;
+
    // move to the offset location
    uint *buffer = data->raster_buffer.buffer + (data->raster_buffer.width * data->offy + data->offx);
-
-   if (solid_source)
-     {
-        while (count--)
-          {
-             uint *target = buffer + (data->raster_buffer.width * spans->y + spans->x);
-             if (spans->coverage == 255)
-               {
-                  _ector_memfill(target, color, spans->len);
-               }
-             else
-               {
-                  uint c = ECTOR_MUL_256(color, spans->coverage);
-                  int ialpha = 255 - spans->coverage;
-                  for (int i = 0; i < spans->len; ++i)
-                    target[i] = c + ECTOR_MUL_256(target[i], ialpha);
-               }
-             ++spans;
-          }
-        return;
-     }
 
    while (count--)
      {
         uint *target = buffer + (data->raster_buffer.width * spans->y + spans->x);
-        uint c =  ECTOR_MUL_256(color, spans->coverage);
-        int ialpha = (~c) >> 24;
-
-        for (int i = 0; i < spans->len; ++i)
-            target[i] = c + ECTOR_MUL_256(target[i], ialpha);
+        comp_func(target, spans->len, color, spans->coverage);
         ++spans;
      }
 }
@@ -62,37 +46,35 @@ typedef void (*src_fetch) (unsigned int *buffer, Span_Data *data, int y, int x, 
 static void
 _blend_gradient(int count, const SW_FT_Span *spans, void *user_data)
 {
-    Span_Data *data = (Span_Data *)(user_data);
-    src_fetch fetchfunc = NULL;
+   ector_comp_func comp_func;
+   Span_Data *data = (Span_Data *)(user_data);
+   src_fetch fetchfunc = NULL;
 
-    if(data->type == LinearGradient) fetchfunc = &fetch_linear_gradient;
-    if(data->type == RadialGradient) fetchfunc = &fetch_radial_gradient;
+   //@TODO, Get the proper composition function using ,color, ECTOR_OP etc.
+   if (data->type == LinearGradient) fetchfunc = &fetch_linear_gradient;
+   if (data->type == RadialGradient) fetchfunc = &fetch_radial_gradient;
+   
+   if (data->mul_col == 0xffffffff) comp_func = &_ector_comp_func_source_over;
+   else comp_func = &_ector_comp_func_source_over_c;
 
-    unsigned int buffer[BLEND_GRADIENT_BUFFER_SIZE];
+   unsigned int buffer[BLEND_GRADIENT_BUFFER_SIZE];
+  // move to the offset location
+   unsigned int *destbuffer = data->raster_buffer.buffer + (data->raster_buffer.width * data->offy + data->offx);
 
-    // move to the offset location
-    unsigned int *destbuffer = data->raster_buffer.buffer + (data->raster_buffer.width * data->offy + data->offx);
-
-    while (count--)
-      {
-         unsigned int *target = destbuffer + (data->raster_buffer.width * spans->y + spans->x);
-         int length = spans->len;
-         while (length)
-           {
-              int l = MIN(length, BLEND_GRADIENT_BUFFER_SIZE);
-              if (fetchfunc)
-                fetchfunc(buffer, data, spans->y, spans->x, l);
-              else
-                memset(buffer, 0, sizeof(buffer));
-              if (data->mul_col == 0xffffffff)
-                _ector_comp_func_source_over(target, buffer, l, spans->coverage); // TODO use proper composition func
-              else
-                _ector_comp_func_source_over_mul_c(target, buffer, data->mul_col, l, spans->coverage);
-              target += l;
-              length -= l;
-           }
-         ++spans;
-      }
+   while (count--)
+     {
+        unsigned int *target = destbuffer + (data->raster_buffer.width * spans->y + spans->x);
+        int length = spans->len;
+        while (length)
+          {
+             int l = MIN(length, BLEND_GRADIENT_BUFFER_SIZE);
+             fetchfunc(buffer, data, spans->y, spans->x, l);
+             comp_func(target, buffer, l, data->mul_col, spans->coverage);
+             target += l;
+             length -= l;
+          }
+        ++spans;
+     }
 }
 
 

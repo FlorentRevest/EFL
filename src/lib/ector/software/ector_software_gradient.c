@@ -164,7 +164,7 @@ fetch_linear_gradient(uint *buffer, Span_Data *data, int y, int x, int length)
    uint *end = buffer + length;
     if (inc > (float)(-1e-5) && inc < (float)(1e-5))
       {
-         _ector_memfill(buffer, _gradient_pixel_fixed(g_data, (int)(t * FIXPT_SIZE)), length);
+         _ector_memfill(buffer, length, _gradient_pixel_fixed(g_data, (int)(t * FIXPT_SIZE)));
       }
     else
       {
@@ -219,7 +219,7 @@ fetch_radial_gradient(uint *buffer, Span_Data *data, int y, int x, int length)
    // avoid division by zero
    if (fabsf(g_data->radial.a) <= 0.00001f)
      {
-        _ector_memfill(buffer, 0, length);
+        _ector_memfill(buffer, length, 0);
         return;
      }
 
