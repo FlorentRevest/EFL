@@ -14,7 +14,7 @@
 
 #include "ector_private.h"
 #include "ector_software_private.h"
-#include "ector_blend_private.h"
+#include "ector_drawhelper_private.h"
 
 
 #define GRADIENT_STOPTABLE_SIZE 1024
@@ -25,27 +25,25 @@
 static inline int
 _gradient_clamp(const Ector_Renderer_Software_Gradient_Data *data, int ipos)
 {
-    if (data->gd->s == EFL_GFX_GRADIENT_SPREAD_REPEAT)
-      {
-         ipos = ipos % GRADIENT_STOPTABLE_SIZE;
-         ipos = ipos < 0 ? GRADIENT_STOPTABLE_SIZE + ipos : ipos;
-      }
-    else if (data->gd->s == EFL_GFX_GRADIENT_SPREAD_REFLECT)
-      {
-         const int limit = GRADIENT_STOPTABLE_SIZE * 2;
-         ipos = ipos % limit;
-         ipos = ipos < 0 ? limit + ipos : ipos;
-         ipos = ipos >= GRADIENT_STOPTABLE_SIZE ? limit - 1 - ipos : ipos;
-      }
-    else
-      {
-         if (ipos < 0)
-           ipos = 0;
-         else if (ipos >= GRADIENT_STOPTABLE_SIZE)
-           ipos = GRADIENT_STOPTABLE_SIZE-1;
-      }
-
-    return ipos;
+   if (data->gd->s == EFL_GFX_GRADIENT_SPREAD_REPEAT)
+     {
+        ipos = ipos % GRADIENT_STOPTABLE_SIZE;
+        ipos = ipos < 0 ? GRADIENT_STOPTABLE_SIZE + ipos : ipos;
+     }
+   else if (data->gd->s == EFL_GFX_GRADIENT_SPREAD_REFLECT)
+     {
+        const int limit = GRADIENT_STOPTABLE_SIZE * 2;
+        ipos = ipos % limit;
+        ipos = ipos < 0 ? limit + ipos : ipos;
+        ipos = ipos >= GRADIENT_STOPTABLE_SIZE ? limit - 1 - ipos : ipos;
+     }
+   else
+     {
+        if (ipos < 0) ipos = 0;
+        else if (ipos >= GRADIENT_STOPTABLE_SIZE)
+          ipos = GRADIENT_STOPTABLE_SIZE-1;
+     }
+   return ipos;
 }
 
 
@@ -68,54 +66,54 @@ typedef double (*BLEND_FUNC)(double progress);
 static double
 _ease_linear(double t)
 {
-    return t;
+   return t;
 }
 
 static void
 _generate_gradient_color_table(Efl_Gfx_Gradient_Stop *gradient_stops, int stop_count, uint *color_table, int size)
 {
-    int pos = 0;
-    Efl_Gfx_Gradient_Stop *curr, *next;
-    assert(stop_count > 0);
+   int pos = 0;
+   Efl_Gfx_Gradient_Stop *curr, *next;
+   assert(stop_count > 0);
 
-    curr = gradient_stops;
-    uint current_color = ECTOR_ARGB_JOIN(curr->a, curr->r, curr->g, curr->b);
-    double incr = 1.0 / (double)size;
-    double fpos = 1.5 * incr;
+   curr = gradient_stops;
+   uint current_color = ECTOR_ARGB_JOIN(curr->a, curr->r, curr->g, curr->b);
+   double incr = 1.0 / (double)size;
+   double fpos = 1.5 * incr;
 
-    color_table[pos++] = current_color;
+   color_table[pos++] = current_color;
 
-    while (fpos <= curr->offset)
-      {
-         color_table[pos] = color_table[pos - 1];
-         pos++;
-         fpos += incr;
-      }
+   while (fpos <= curr->offset)
+     {
+        color_table[pos] = color_table[pos - 1];
+        pos++;
+        fpos += incr;
+     }
 
-    for (int i = 0; i < stop_count - 1; ++i)
-      {
-         curr = (gradient_stops + i);
-         next = (gradient_stops + i + 1);
-         double delta = 1/(next->offset - curr->offset);
-         uint next_color = ECTOR_ARGB_JOIN(next->a, next->r, next->g, next->b);
-         BLEND_FUNC func = &_ease_linear;
-         while (fpos < next->offset && pos < size)
-           {
-              double t = func((fpos - curr->offset) * delta);
-              int dist = (int)(256 * t);
-              int idist = 256 - dist;
-              color_table[pos] = INTERPOLATE_PIXEL_256(current_color, idist, next_color, dist);
-              ++pos;
-              fpos += incr;
-           }
-         current_color = next_color;
-      }
+   for (int i = 0; i < stop_count - 1; ++i)
+     {
+        curr = (gradient_stops + i);
+        next = (gradient_stops + i + 1);
+        double delta = 1/(next->offset - curr->offset);
+        uint next_color = ECTOR_ARGB_JOIN(next->a, next->r, next->g, next->b);
+        BLEND_FUNC func = &_ease_linear;
+        while (fpos < next->offset && pos < size)
+          {
+             double t = func((fpos - curr->offset) * delta);
+             int dist = (int)(256 * t);
+             int idist = 256 - dist;
+             color_table[pos] = INTERPOLATE_PIXEL_256(current_color, idist, next_color, dist);
+             ++pos;
+             fpos += incr;
+          }
+        current_color = next_color;
+     }
 
-    for (;pos < size; ++pos)
-      color_table[pos] = current_color;
+   for (;pos < size; ++pos)
+     color_table[pos] = current_color;
 
-    // Make sure the last color stop is represented at the end of the table
-    color_table[size-1] = current_color;
+   // Make sure the last color stop is represented at the end of the table
+   color_table[size-1] = current_color;
 }
 
 
@@ -137,7 +135,6 @@ destroy_color_table(Ector_Renderer_Software_Gradient_Data *gdata)
         gdata->color_table = NULL;
      }
 }
-
 
 void
 fetch_linear_gradient(uint *buffer, Span_Data *data, int y, int x, int length)
@@ -202,13 +199,13 @@ static void
 _radial_helper_generic(uint *buffer, int length, Ector_Renderer_Software_Gradient_Data *g_data, float det,
                        float delta_det, float delta_delta_det, float b, float delta_b)
 {
-    for (int i = 0 ; i < length ; i++)
-      {
-         *buffer++ = _gradient_pixel(g_data, sqrt(det) - b);
-         det += delta_det;
-         delta_det += delta_delta_det;
-         b += delta_b;
-      }
+   for (int i = 0 ; i < length ; i++)
+     {
+        *buffer++ = _gradient_pixel(g_data, sqrt(det) - b);
+        det += delta_det;
+        delta_det += delta_delta_det;
+        b += delta_b;
+     }
 }
 
 void

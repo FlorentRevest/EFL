@@ -8,25 +8,18 @@
 
 #include "ector_private.h"
 #include "ector_software_private.h"
-#include "ector_blend_private.h"
 
-
-typedef void (*ector_comp_func)(uint *dest, const uint *src, int length, uint mul_col, uint const_alpha);
-typedef void (*ector_comp_func_solid)(uint *dest, int length, uint color, uint const_alpha);
+#include "ector_drawhelper_private.h"
 
 static void
 _blend_color_argb(int count, const SW_FT_Span *spans, void *user_data)
 {
-   ector_comp_func_solid comp_func;
+   RGBA_Comp_Func_Solid comp_func;
    Span_Data *data = (Span_Data *)(user_data);
 
    // multiply the color with mul_col if any
    uint color = ECTOR_MUL4_SYM(data->color, data->mul_col);
-   Eina_Bool solid_source = ((color >> 24) == 255);
-
-   //@TODO, Get the proper composition function using ,color, ECTOR_OP etc.
-   if (solid_source) comp_func = &_ector_comp_func_solid_source_copy;
-   else comp_func = &_ector_comp_func_solid_source_blend;
+   comp_func = ector_comp_func_solid_span_get(data->op, color);
 
    // move to the offset location
    uint *buffer = data->raster_buffer.buffer + (data->raster_buffer.width * data->offy + data->offx);
@@ -46,16 +39,15 @@ typedef void (*src_fetch) (unsigned int *buffer, Span_Data *data, int y, int x, 
 static void
 _blend_gradient(int count, const SW_FT_Span *spans, void *user_data)
 {
-   ector_comp_func comp_func;
+   RGBA_Comp_Func comp_func;
    Span_Data *data = (Span_Data *)(user_data);
    src_fetch fetchfunc = NULL;
 
    //@TODO, Get the proper composition function using ,color, ECTOR_OP etc.
    if (data->type == LinearGradient) fetchfunc = &fetch_linear_gradient;
    if (data->type == RadialGradient) fetchfunc = &fetch_radial_gradient;
-   
-   if (data->mul_col == 0xffffffff) comp_func = &_ector_comp_func_source_over;
-   else comp_func = &_ector_comp_func_source_over_c;
+
+   comp_func = ector_comp_func_span_get(data->op, data->mul_col);
 
    unsigned int buffer[BLEND_GRADIENT_BUFFER_SIZE];
   // move to the offset location
