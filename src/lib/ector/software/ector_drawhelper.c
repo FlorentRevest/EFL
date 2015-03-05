@@ -105,7 +105,6 @@ comp_func_solid_source(uint *dest, int length, uint color, uint const_alpha)
 static void
 comp_func_source(uint *dest, const uint *src, int length, uint color, uint const_alpha)
 {
-   printf("draw\t");
    if (color == 0xffffffff) // No color multiplier
      {
         if (const_alpha == 255)

@@ -38,6 +38,82 @@ byte_mul_sse3(__m128i c, __m128i a)
    return _mm_add_epi32(c0, c1);
 }
 
+static inline __m128i
+interp4_256_sse3(__m128i a, __m128i c0, __m128i c1)
+{
+   const __m128i rb_mask = _mm_set1_epi32(0xFF00FF00);
+   const __m128i zero = _mm_setzero_si128();
+
+   __m128i a_l = a;
+   __m128i a_h = a;
+   a_l = _mm_unpacklo_epi16(a_l, a_l);
+   a_h = _mm_unpackhi_epi16(a_h, a_h);
+
+   __m128i a_t = _mm_slli_epi64(a_l, 32);
+   __m128i a_t0 = _mm_slli_epi64(a_h, 32);
+
+   a_l = _mm_add_epi32(a_l, a_t);
+   a_h = _mm_add_epi32(a_h, a_t0);
+
+   __m128i c0_l = c0;
+   __m128i c0_h = c0;
+
+   c0_l = _mm_unpacklo_epi8(c0_l, zero);
+   c0_h = _mm_unpackhi_epi8(c0_h, zero);
+
+   __m128i c1_l = c1;
+   __m128i c1_h = c1;
+
+   c1_l = _mm_unpacklo_epi8(c1_l, zero);
+   c1_h = _mm_unpackhi_epi8(c1_h, zero);
+
+   __m128i cl_sub = _mm_sub_epi16(c0_l, c1_l);
+   __m128i ch_sub = _mm_sub_epi16(c0_h, c1_h);
+
+   cl_sub = _mm_mullo_epi16(cl_sub, a_l);
+   ch_sub = _mm_mullo_epi16(ch_sub, a_h);
+
+   __m128i c1ls = _mm_slli_epi16(c1_l, 8);
+   __m128i c1hs = _mm_slli_epi16(c1_h, 8);
+
+   cl_sub = _mm_add_epi16(cl_sub, c1ls);
+   ch_sub = _mm_add_epi16(ch_sub, c1hs);
+
+   cl_sub = _mm_and_si128(cl_sub, rb_mask);
+   ch_sub = _mm_and_si128(ch_sub, rb_mask);
+
+   cl_sub = _mm_srli_epi64(cl_sub, 8);
+   ch_sub = _mm_srli_epi64(ch_sub, 8);
+
+   cl_sub = _mm_packus_epi16(cl_sub, cl_sub);
+   ch_sub = _mm_packus_epi16(ch_sub, ch_sub);
+
+   return  (__m128i) _mm_shuffle_ps( (__m128)cl_sub, (__m128)ch_sub, 0x44);
+}
+
+static inline __m128i
+mul4_sym_sse3(__m128i x, __m128i y) {
+
+   const __m128i zero = _mm_setzero_si128();
+   const __m128i sym4_mask = _mm_set_epi32(0x00FF00FF, 0x000000FF, 0x00FF00FF, 0x000000FF);
+   __m128i x_l = _mm_unpacklo_epi8(x, zero);
+   __m128i x_h = _mm_unpackhi_epi8(x, zero);
+
+   __m128i y_l = _mm_unpacklo_epi8(y, zero);
+   __m128i y_h = _mm_unpackhi_epi8(y, zero);
+
+   __m128i r_l = _mm_mullo_epi16(x_l, y_l);
+   __m128i r_h = _mm_mullo_epi16(x_h, y_h);
+
+   r_l = _mm_add_epi16(r_l, sym4_mask);
+   r_h = _mm_add_epi16(r_h, sym4_mask);
+
+   r_l = _mm_srli_epi16(r_l, 8);
+   r_h = _mm_srli_epi16(r_h, 8);
+
+   return  _mm_packus_epi16(r_l, r_h);
+}
+
 
 // dest = color + (dest * alpha)
 inline static void
@@ -93,81 +169,81 @@ comp_func_solid_source_over_sse2(uint *dest, int length, uint color, uint const_
    comp_func_helper_sse2(dest, length, color, ialpha);
 }
 
+static void
+comp_func_source_sse2(uint *dest, const uint *src, int length, uint color, uint const_alpha)
+{
+   if (color == 0xffffffff) // No color multiplier
+     {
+        if (const_alpha == 255)
+          memcpy(dest, src, length * sizeof(uint));
+        else
+         {
+            int ialpha = 255 - const_alpha;
+            __m128i v_alpha = _mm_set1_epi32(const_alpha);
+            LOOP_ALIGNED_U1_A4(dest, length,
+              { /* UOP */
 
-/*
- * Each 32bits components of alphaChannel must be in the form 0x00AA00AA
- * oneMinusAlphaChannel must be 255 - alpha for each 32 bits component
- * colorMask must have 0x00ff00ff on each 32 bits component
- * half must have the value 128 (0x80) for each 32 bits compnent
- */
-// #define INTERPOLATE_PIXEL_255_SSE2(result, srcVector, dstVector, alphaChannel, oneMinusAlphaChannel, colorMask, half) { \
-//     /* interpolate AG */\
-//     __m128i srcVectorAG = _mm_srli_epi16(srcVector, 8); \
-//     __m128i dstVectorAG = _mm_srli_epi16(dstVector, 8); \
-//     __m128i srcVectorAGalpha = _mm_mullo_epi16(srcVectorAG, alphaChannel); \
-//     __m128i dstVectorAGoneMinusAlphalpha = _mm_mullo_epi16(dstVectorAG, oneMinusAlphaChannel); \
-//     __m128i finalAG = _mm_add_epi16(srcVectorAGalpha, dstVectorAGoneMinusAlphalpha); \
-//     finalAG = _mm_add_epi16(finalAG, _mm_srli_epi16(finalAG, 8)); \
-//     finalAG = _mm_add_epi16(finalAG, half); \
-//     finalAG = _mm_andnot_si128(colorMask, finalAG); \
-//  \
-//     /* interpolate RB */\
-//     __m128i srcVectorRB = _mm_and_si128(srcVector, colorMask); \
-//     __m128i dstVectorRB = _mm_and_si128(dstVector, colorMask); \
-//     __m128i srcVectorRBalpha = _mm_mullo_epi16(srcVectorRB, alphaChannel); \
-//     __m128i dstVectorRBoneMinusAlphalpha = _mm_mullo_epi16(dstVectorRB, oneMinusAlphaChannel); \
-//     __m128i finalRB = _mm_add_epi16(srcVectorRBalpha, dstVectorRBoneMinusAlphalpha); \
-//     finalRB = _mm_add_epi16(finalRB, _mm_srli_epi16(finalRB, 8)); \
-//     finalRB = _mm_add_epi16(finalRB, half); \
-//     finalRB = _mm_srli_epi16(finalRB, 8); \
-//  \
-//     /* combine */\
-//     result = _mm_or_si128(finalAG, finalRB); \
-// }
+                 *dest = INTERPOLATE_PIXEL_256(*src, const_alpha, *dest, ialpha);
+                 dest++; src++; length--;
+              },
+              { /* A4OP */
+                const __m128i v_src = _mm_loadu_si128((__m128i *)src);
+                __m128i v_dest = _mm_load_si128((__m128i *)dest);
+                v_dest = interp4_256_sse3(v_alpha, v_src, v_dest);
+                _mm_store_si128((__m128i *)dest, v_dest);
+                 dest += 4; src +=4; length -= 4;
+              })
+         }
+     }
+   else
+     {
+        __m128i v_color = _mm_set1_epi32(color);
+        if (const_alpha == 255)
+          {
+             LOOP_ALIGNED_U1_A4(dest, length,
+               { /* UOP */
 
-// static void
-// comp_func_source_sse2(uint *dest, const uint *src, int length, uint color, uint const_alpha)
-// {
-//    if (color == 0xffffffff) // No color multiplier
-//      {
-//         if (const_alpha == 255)
-//           memcpy(dest, src, length * sizeof(uint));
-//         else
-//          {
-//             int ialpha = 255 - const_alpha;
-//             const __m128i half = _mm_set1_epi16(0x80);
-//             const __m128i colorMask = _mm_set1_epi32(0x00ff00ff);
-//             const __m128i constAlphaVector = _mm_set1_epi16(const_alpha);
-//             const __m128i oneMinusConstAlpha =  _mm_set1_epi16(ialpha);
-//             LOOP_ALIGNED_U1_A4(dest, length,
-//               { /* UOP */
-
-//                  *dest = INTERPOLATE_PIXEL_256(*src, const_alpha, *dest, ialpha);
-//                  dest++; src++; length--;
-//               },
-//               { /* A4OP */
-//                 const __m128i srcVector = _mm_loadu_si128((__m128i *)src);
-//                 __m128i dstVector = _mm_load_si128((__m128i *)dest);
-//                 INTERPOLATE_PIXEL_255_SSE2(dstVector, srcVector, dstVector, constAlphaVector, oneMinusConstAlpha, colorMask, half)
-//                 _mm_store_si128((__m128i *)dest, dstVector);
-                 
-//                  dest += 4; length -= 4;
-//               })
-//          }
-//      }
-//    else
-//      {
-
-//      }
-// }
+                  *dest = ECTOR_MUL4_SYM(*src, color);
+                  dest++; src++; length--;
+               },
+               { /* A4OP */
+                  __m128i v_src = _mm_loadu_si128((__m128i *)src);
+                  v_src = mul4_sym_sse3(v_src, v_color);
+                  _mm_store_si128((__m128i *)dest, v_src);
+                  dest += 4; src +=4; length -= 4;
+               })
+          }
+        else
+          {
+             int ialpha = 255 - const_alpha;
+             __m128i v_alpha = _mm_set1_epi32(const_alpha);
+             LOOP_ALIGNED_U1_A4(dest, length,
+               { /* UOP */
+                  uint src_color = ECTOR_MUL4_SYM(*src, color);
+                  *dest = INTERPOLATE_PIXEL_256(src_color, const_alpha, *dest, ialpha);
+                  dest++; src++; length--;
+               },
+               { /* A4OP */
+                  __m128i v_src = _mm_loadu_si128((__m128i *)src);
+                  __m128i v_dest = _mm_load_si128((__m128i *)dest);
+                  v_src = mul4_sym_sse3(v_src, v_color);
+                  v_dest = interp4_256_sse3(v_alpha, v_src, v_dest);
+                  _mm_store_si128((__m128i *)dest, v_dest);
+                  dest += 4; src +=4; length -= 4;
+               })
+          }
+     }
+}
 
 
 void
 init_draw_helper_sse2()
 {
+   // update the comp_function table for solid color
    func_for_mode_solid[ECTOR_ROP_COPY] = comp_func_solid_source_sse2;
    func_for_mode_solid[ECTOR_ROP_BLEND] = comp_func_solid_source_over_sse2;
-   //func_for_mode[ECTOR_ROP_BLEND] = comp_func_source_sse2;
+   // update the comp_function table for source data
+   func_for_mode[ECTOR_ROP_COPY] = comp_func_source_sse2;
 }
 
 
