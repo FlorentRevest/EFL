@@ -13,6 +13,12 @@
 typedef unsigned int uint;
 #endif
 
+inline int Alpha(uint c)
+{
+   return c>>24;
+}
+
+
 
 #define ECTOR_ARGB_JOIN(a,r,g,b) \
         (((a) << 24) + ((r) << 16) + ((g) << 8) + (b))
@@ -27,6 +33,23 @@ typedef unsigned int uint;
  ( (((((c) >> 8) & 0x00ff00ff) * (a)) & 0xff00ff00) + \
    (((((c) & 0x00ff00ff) * (a)) >> 8) & 0x00ff00ff) )
 
+#define LOOP_ALIGNED_U1_A4(DEST, LENGTH, UOP, A4OP) \
+   { \
+      while((uintptr_t)DEST & 0xF && LENGTH) UOP \
+   \
+      while(LENGTH) { \
+         switch(LENGTH) { \
+            case 3: \
+            case 2: \
+            case 1: \
+               UOP \
+               break; \
+            default: \
+               A4OP \
+               break; \
+         } \
+      } \
+   }
 
 static inline void
 _ector_memfill(uint *dest, int length, uint value)
@@ -63,8 +86,13 @@ INTERPOLATE_PIXEL_256(uint x, uint a, uint y, uint b)
 
 typedef void (*RGBA_Comp_Func)(uint *dest, const uint *src, int length, uint mul_col, uint const_alpha);
 typedef void (*RGBA_Comp_Func_Solid)(uint *dest, int length, uint color, uint const_alpha);
+extern RGBA_Comp_Func_Solid func_for_mode_solid[ECTOR_ROP_LAST];
+extern RGBA_Comp_Func func_for_mode[ECTOR_ROP_LAST];
+
+void init_draw_helper();
+void init_draw_helper_sse2();
 
 RGBA_Comp_Func_Solid ector_comp_func_solid_span_get(Ector_Rop op, uint color);
-RGBA_Comp_Func ector_comp_func_span_get(Ector_Rop op, uint color);
+RGBA_Comp_Func ector_comp_func_span_get(Ector_Rop op, uint color, Eina_Bool src_alpha);
 
 #endif

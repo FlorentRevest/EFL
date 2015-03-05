@@ -47,7 +47,7 @@ _blend_gradient(int count, const SW_FT_Span *spans, void *user_data)
    if (data->type == LinearGradient) fetchfunc = &fetch_linear_gradient;
    if (data->type == RadialGradient) fetchfunc = &fetch_radial_gradient;
 
-   comp_func = ector_comp_func_span_get(data->op, data->mul_col);
+   comp_func = ector_comp_func_span_get(data->op, data->mul_col, data->gradient->alpha);
 
    unsigned int buffer[BLEND_GRADIENT_BUFFER_SIZE];
   // move to the offset location
@@ -295,6 +295,7 @@ void ector_software_rasterizer_init(Software_Rasterizer *rasterizer)
    rasterizer->fill_data.clip.enabled = EINA_FALSE;
    rasterizer->fill_data.unclipped_blend = 0;
    rasterizer->fill_data.blend = 0;
+   init_draw_helper();
 }
 
 void ector_software_rasterizer_done(Software_Rasterizer *rasterizer)
