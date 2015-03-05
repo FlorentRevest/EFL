@@ -69,14 +69,16 @@ _ease_linear(double t)
    return t;
 }
 
-static void
+static Eina_Bool
 _generate_gradient_color_table(Efl_Gfx_Gradient_Stop *gradient_stops, int stop_count, uint *color_table, int size)
 {
    int pos = 0;
+   Eina_Bool alpha = EINA_FALSE;
    Efl_Gfx_Gradient_Stop *curr, *next;
    assert(stop_count > 0);
 
    curr = gradient_stops;
+   if (curr->a != 255) alpha = EINA_TRUE;
    uint current_color = ECTOR_ARGB_JOIN(curr->a, curr->r, curr->g, curr->b);
    double incr = 1.0 / (double)size;
    double fpos = 1.5 * incr;
@@ -95,6 +97,7 @@ _generate_gradient_color_table(Efl_Gfx_Gradient_Stop *gradient_stops, int stop_c
         curr = (gradient_stops + i);
         next = (gradient_stops + i + 1);
         double delta = 1/(next->offset - curr->offset);
+        if (next->a != 255) alpha = EINA_TRUE;
         uint next_color = ECTOR_ARGB_JOIN(next->a, next->r, next->g, next->b);
         BLEND_FUNC func = &_ease_linear;
         while (fpos < next->offset && pos < size)
@@ -114,6 +117,7 @@ _generate_gradient_color_table(Efl_Gfx_Gradient_Stop *gradient_stops, int stop_c
 
    // Make sure the last color stop is represented at the end of the table
    color_table[size-1] = current_color;
+   return alpha;
 }
 
 
@@ -123,7 +127,7 @@ update_color_table(Ector_Renderer_Software_Gradient_Data *gdata)
    if(gdata->color_table) return;
 
    gdata->color_table = malloc(GRADIENT_STOPTABLE_SIZE * 4);
-   _generate_gradient_color_table(gdata->gd->colors, gdata->gd->colors_count, gdata->color_table, GRADIENT_STOPTABLE_SIZE);
+   gdata->alpha = _generate_gradient_color_table(gdata->gd->colors, gdata->gd->colors_count, gdata->color_table, GRADIENT_STOPTABLE_SIZE);
 }
 
 void
