@@ -43,8 +43,8 @@ comp_func_source_over(uint *dest, const uint *src, int length, uint color, uint 
                     dest[i] = s;
                   else if (s != 0)
                     {
-                       uint a = Alpha(~s);
-                       dest[i] = s + BYTE_MUL(dest[i], a);
+                       uint sia = Alpha(~s);
+                       dest[i] = s + BYTE_MUL(dest[i], sia);
                     }
               }
           }
@@ -53,8 +53,8 @@ comp_func_source_over(uint *dest, const uint *src, int length, uint color, uint 
              for (int i = 0; i < length; ++i)
                {
                   uint s = BYTE_MUL(src[i], const_alpha);
-                  uint a = Alpha(~s);
-                  dest[i] = s + BYTE_MUL(dest[i], a);
+                  uint sia = Alpha(~s);
+                  dest[i] = s + BYTE_MUL(dest[i], sia);
                }
           }
      }
@@ -66,8 +66,8 @@ comp_func_source_over(uint *dest, const uint *src, int length, uint color, uint 
                {
                   uint s = src[i];
                   uint sc = ECTOR_MUL4_SYM(color, s);
-                  uint a = Alpha(~sc);
-                  dest[i] = sc + BYTE_MUL(dest[i], a);
+                  uint sia = Alpha(~sc);
+                  dest[i] = sc + BYTE_MUL(dest[i], sia);
                }
           }
         else
@@ -77,8 +77,8 @@ comp_func_source_over(uint *dest, const uint *src, int length, uint color, uint 
                   uint s = src[i];
                   uint sc = ECTOR_MUL4_SYM(color, s);
                   sc = BYTE_MUL(sc, const_alpha);
-                  uint a = Alpha(~sc);
-                  dest[i] = sc + BYTE_MUL(dest[i], a);
+                  uint sia = Alpha(~sc);
+                  dest[i] = sc + BYTE_MUL(dest[i], sia);
                }
           }
      }

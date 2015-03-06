@@ -15,7 +15,7 @@
 // __m128i a = (__m128i) _mm_shuffle_ps( (__m128)v_al, (__m128)v_ah, 0x88);
 //
 inline static __m128i
-byte_mul_sse3(__m128i c, __m128i a)
+v4_byte_mul_special_sse2(__m128i c, __m128i a)
 {
    const __m128i ga_mask = _mm_set1_epi32(0x00FF00FF);
    const __m128i rb_mask = _mm_set1_epi32(0xFF00FF00);
@@ -38,8 +38,35 @@ byte_mul_sse3(__m128i c, __m128i a)
    return _mm_add_epi32(c0, c1);
 }
 
+inline static __m128i
+v4_byte_mul_sse2(__m128i c, __m128i a)
+{
+   const __m128i ga_mask = _mm_set1_epi32(0x00FF00FF);
+   const __m128i rb_mask = _mm_set1_epi32(0xFF00FF00);
+   __m128i v_al = _mm_unpacklo_epi16(a, a);
+   __m128i v_ah = _mm_unpackhi_epi16(a, a);
+   __m128i v_a = (__m128i) _mm_shuffle_ps( (__m128)v_al, (__m128)v_ah, 0x88);
+
+   /* first half of calc */
+   __m128i c0 = c;
+   c0 = _mm_srli_epi32(c0, 8);
+   c0 = _mm_and_si128(ga_mask, c0);
+   c0 = _mm_mullo_epi16(v_a, c0);
+   c0 = _mm_and_si128(rb_mask, c0);
+
+   /* second half of calc */
+   __m128i c1 = c;
+   c1 = _mm_and_si128(ga_mask, c1);
+   c1 = _mm_mullo_epi16(v_a, c1);
+   c1 = _mm_srli_epi32(c1, 8);
+   c1 = _mm_and_si128(ga_mask, c1);
+
+   /* combine */
+   return _mm_add_epi32(c0, c1);
+}
+
 static inline __m128i
-interp4_256_sse3(__m128i a, __m128i c0, __m128i c1)
+v4_interpolate_color_sse2(__m128i a, __m128i c0, __m128i c1)
 {
    const __m128i rb_mask = _mm_set1_epi32(0xFF00FF00);
    const __m128i zero = _mm_setzero_si128();
@@ -92,7 +119,7 @@ interp4_256_sse3(__m128i a, __m128i c0, __m128i c1)
 }
 
 static inline __m128i
-mul4_sym_sse3(__m128i x, __m128i y) {
+v4_mul_color_sse2(__m128i x, __m128i y) {
 
    const __m128i zero = _mm_setzero_si128();
    const __m128i sym4_mask = _mm_set_epi32(0x00FF00FF, 0x000000FF, 0x00FF00FF, 0x000000FF);
@@ -114,7 +141,12 @@ mul4_sym_sse3(__m128i x, __m128i y) {
    return  _mm_packus_epi16(r_l, r_h);
 }
 
-
+static inline __m128i
+v4_ialpha_sse2(__m128i c)
+{
+   __m128i a = _mm_srli_epi32(c, 24);
+   return _mm_sub_epi32(_mm_set1_epi32(0xff), a);
+}
 // dest = color + (dest * alpha)
 inline static void
 comp_func_helper_sse2 (uint *dest, int length, uint color, uint alpha)
@@ -137,7 +169,7 @@ comp_func_helper_sse2 (uint *dest, int length, uint color, uint alpha)
 
          __m128i v_dest = _mm_load_si128((__m128i *)dest);
 
-         v_dest = byte_mul_sse3(v_dest, v_a);
+         v_dest = v4_byte_mul_special_sse2(v_dest, v_a);
          v_dest = _mm_add_epi32(v_dest, v_color);
 
          _mm_store_si128((__m128i *)dest, v_dest);
@@ -189,7 +221,7 @@ comp_func_source_sse2(uint *dest, const uint *src, int length, uint color, uint 
               { /* A4OP */
                 const __m128i v_src = _mm_loadu_si128((__m128i *)src);
                 __m128i v_dest = _mm_load_si128((__m128i *)dest);
-                v_dest = interp4_256_sse3(v_alpha, v_src, v_dest);
+                v_dest = v4_interpolate_color_sse2(v_alpha, v_src, v_dest);
                 _mm_store_si128((__m128i *)dest, v_dest);
                  dest += 4; src +=4; length -= 4;
               })
@@ -208,7 +240,7 @@ comp_func_source_sse2(uint *dest, const uint *src, int length, uint color, uint 
                },
                { /* A4OP */
                   __m128i v_src = _mm_loadu_si128((__m128i *)src);
-                  v_src = mul4_sym_sse3(v_src, v_color);
+                  v_src = v4_mul_color_sse2(v_src, v_color);
                   _mm_store_si128((__m128i *)dest, v_src);
                   dest += 4; src +=4; length -= 4;
                })
@@ -224,10 +256,137 @@ comp_func_source_sse2(uint *dest, const uint *src, int length, uint color, uint 
                   dest++; src++; length--;
                },
                { /* A4OP */
+                  // 1. load src and dest vector
                   __m128i v_src = _mm_loadu_si128((__m128i *)src);
                   __m128i v_dest = _mm_load_si128((__m128i *)dest);
-                  v_src = mul4_sym_sse3(v_src, v_color);
-                  v_dest = interp4_256_sse3(v_alpha, v_src, v_dest);
+
+                  // 2. multiply src color with const_alpha
+                  v_src = v4_mul_color_sse2(v_src, v_color);
+
+                  // 3. dest = s * ca + d * cia
+                  v_dest = v4_interpolate_color_sse2(v_alpha, v_src, v_dest);
+
+                  _mm_store_si128((__m128i *)dest, v_dest);
+                  dest += 4; src +=4; length -= 4;
+               })
+          }
+     }
+}
+
+static void
+comp_func_source_over_sse2(uint *dest, const uint *src, int length, uint color, uint const_alpha)
+{
+   if (color == 0xffffffff) // No color multiplier
+     {
+        if (const_alpha == 255)
+         {
+            LOOP_ALIGNED_U1_A4(dest, length,
+              { /* UOP */
+                 uint s = *src;
+                 uint sia = Alpha(~s);
+                 *dest = s + BYTE_MUL(*dest, sia);
+                 dest++; src++; length--;
+              },
+              { /* A4OP */
+                 
+                 // 1. load src and dest vector
+                 __m128i v_src = _mm_loadu_si128((__m128i *)src);
+                 __m128i v_dest = _mm_load_si128((__m128i *)dest);
+                 
+                 // 2. dest = src + dest * sia
+                 __m128i v_sia = v4_ialpha_sse2(v_src);;
+                 v_dest = v4_byte_mul_sse2(v_dest, v_sia);
+                 v_dest = _mm_add_epi32(v_dest, v_src);
+
+                 _mm_store_si128((__m128i *)dest, v_dest);
+                 dest += 4; src +=4; length -= 4;
+              })
+         }
+        else
+         {
+            __m128i v_alpha = _mm_set1_epi32(const_alpha);
+            LOOP_ALIGNED_U1_A4(dest, length,
+              { /* UOP */
+                 uint s = BYTE_MUL(*src, const_alpha);
+                 uint sia = Alpha(~s);
+                 *dest = s + BYTE_MUL(*dest, sia);
+                 dest++; src++; length--;
+              },
+              { /* A4OP */
+                 
+                 // 1. load src and dest vector
+                 __m128i v_src = _mm_loadu_si128((__m128i *)src);
+                 __m128i v_dest = _mm_load_si128((__m128i *)dest);
+                 
+                 // 2. multiply src color with const_alpha
+                 v_src = v4_byte_mul_sse2(v_src, v_alpha);
+
+                 // 3. dest = src + dest * sia
+                 __m128i v_sia = v4_ialpha_sse2(v_src);;
+                 v_dest = v4_byte_mul_sse2(v_dest, v_sia);
+                 v_dest = _mm_add_epi32(v_dest, v_src);
+
+                 _mm_store_si128((__m128i *)dest, v_dest);
+                 dest += 4; src +=4; length -= 4;
+              })
+         }
+     }
+   else
+     {
+        __m128i v_color = _mm_set1_epi32(color);
+        if (const_alpha == 255)
+          {
+             LOOP_ALIGNED_U1_A4(dest, length,
+               { /* UOP */
+                  uint s = ECTOR_MUL4_SYM(*src, color);
+                  uint sia = Alpha(~s);
+                  *dest = s + BYTE_MUL(*dest, sia);
+                  dest++; src++; length--;
+               },
+               { /* A4OP */
+                  // 1. load src and dest vector
+                  __m128i v_src = _mm_loadu_si128((__m128i *)src);
+                  __m128i v_dest = _mm_load_si128((__m128i *)dest);
+
+                  // 2. multiply src color with color multiplier
+                  v_src = v4_mul_color_sse2(v_src, v_color);
+
+                  // 3. dest = src + dest * sia
+                  __m128i v_sia = v4_ialpha_sse2(v_src);
+                  v_dest = v4_byte_mul_sse2(v_dest, v_sia);
+                  v_dest = _mm_add_epi32(v_dest, v_src);
+
+                  _mm_store_si128((__m128i *)dest, v_dest);
+                  dest += 4; src +=4; length -= 4;
+               })
+          }
+        else
+          {
+             __m128i v_alpha = _mm_set1_epi32(const_alpha);
+             LOOP_ALIGNED_U1_A4(dest, length,
+               { /* UOP */
+                  uint s = ECTOR_MUL4_SYM(*src, color);
+                  s = BYTE_MUL(s, const_alpha);
+                  uint sia = Alpha(~s);
+                  *dest = s + BYTE_MUL(*dest, sia);
+                  dest++; src++; length--;
+               },
+               { /* A4OP */
+                  // 1. load src and dest vector
+                  __m128i v_src = _mm_loadu_si128((__m128i *)src);
+                  __m128i v_dest = _mm_load_si128((__m128i *)dest);
+
+                  // 2. multiply src color with color multiplier
+                  v_src = v4_mul_color_sse2(v_src, v_color);
+
+                  // 3. multiply src color with const_alpha
+                  v_src = v4_byte_mul_sse2(v_src, v_alpha);
+
+                  // 4. dest = src + dest * sia
+                  __m128i v_sia = v4_ialpha_sse2(v_src);
+                  v_dest = v4_byte_mul_sse2(v_dest, v_sia);
+                  v_dest = _mm_add_epi32(v_dest, v_src);
+
                   _mm_store_si128((__m128i *)dest, v_dest);
                   dest += 4; src +=4; length -= 4;
                })
@@ -242,8 +401,10 @@ init_draw_helper_sse2()
    // update the comp_function table for solid color
    func_for_mode_solid[ECTOR_ROP_COPY] = comp_func_solid_source_sse2;
    func_for_mode_solid[ECTOR_ROP_BLEND] = comp_func_solid_source_over_sse2;
+   
    // update the comp_function table for source data
    func_for_mode[ECTOR_ROP_COPY] = comp_func_source_sse2;
+   func_for_mode[ECTOR_ROP_BLEND] = comp_func_source_over_sse2;
 }
 
 
