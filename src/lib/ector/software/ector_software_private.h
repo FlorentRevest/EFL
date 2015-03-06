@@ -14,8 +14,6 @@ typedef unsigned int uint;
 
 typedef struct _Ector_Software_Surface_Data Ector_Software_Surface_Data;
 
-#define CHECK_SOFTWARE(Parent) (!(Parent && Parent->software))
-
 // Gradient related structure
 typedef struct _Software_Gradient_Linear_Data
 {
@@ -118,7 +116,6 @@ struct _Ector_Software_Surface_Data
    int x;
    int y;
 };
-
 
 void ector_software_rasterizer_init(Software_Rasterizer *rasterizer);
 void ector_software_rasterizer_done(Software_Rasterizer *rasterizer);

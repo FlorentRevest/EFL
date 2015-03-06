@@ -21,6 +21,14 @@
 #define FIXPT_BITS 8
 #define FIXPT_SIZE (1<<FIXPT_BITS)
 
+typedef void (*Radial_Helper_Func)(uint *buffer, int length, Ector_Renderer_Software_Gradient_Data *g_data, float det,
+                              float delta_det, float delta_delta_det, float b, float delta_b);
+
+typedef void (*Linear_Helper_Func)(uint *buffer, int length, Ector_Renderer_Software_Gradient_Data *g_data,
+                              int t_fixed, int inc_fixed);
+
+Radial_Helper_Func radial_helper;
+Linear_Helper_Func linear_helper;
 
 static inline int
 _gradient_clamp(const Ector_Renderer_Software_Gradient_Data *data, int ipos)
@@ -60,6 +68,209 @@ _gradient_pixel(const Ector_Renderer_Software_Gradient_Data *data, float pos)
    int ipos = (int)(pos * (GRADIENT_STOPTABLE_SIZE - 1) + (float)(0.5));
    return data->color_table[_gradient_clamp(data, ipos)];
 }
+
+
+#ifdef BUILD_SSE3
+#include <immintrin.h>
+
+#define GRADIENT_STOPTABLE_SIZE_SHIFT 10
+typedef union{ __m128i v; int i[4];}vec4_i;
+typedef union{ __m128 v; float f[4];}vec4_f;
+
+#define FETCH_CLAMP_INIT_F \
+    __m128 v_min = _mm_set1_ps(0.0f); \
+    __m128 v_max = _mm_set1_ps((float)(GRADIENT_STOPTABLE_SIZE-1)); \
+    __m128 v_halff = _mm_set1_ps(0.5f); \
+    __m128i v_repeat_mask = _mm_set1_epi32(~((uint)(0xffffff) << GRADIENT_STOPTABLE_SIZE_SHIFT)); \
+    __m128i v_reflect_mask = _mm_set1_epi32(~((uint)(0xffffff) << (GRADIENT_STOPTABLE_SIZE_SHIFT+1))); \
+    __m128i v_reflect_limit = _mm_set1_epi32(2 * GRADIENT_STOPTABLE_SIZE - 1); 
+
+#define FETCH_CLAMP_REPEAT_F \
+   vec4_i index_vec; \
+   index_vec.v = _mm_and_si128(v_repeat_mask, _mm_cvttps_epi32(v_index));
+
+#define FETCH_CLAMP_REFLECT_F \
+   vec4_i index_vec; \
+   __m128i v_index_i = _mm_and_si128(v_reflect_mask, _mm_cvttps_epi32(v_index)); \
+   __m128i v_index_i_inv = _mm_sub_epi32(v_reflect_limit, v_index_i); \
+   index_vec.v = _mm_min_epi16(v_index_i, v_index_i_inv);
+
+#define FETCH_CLAMP_PAD_F \
+   vec4_i index_vec; \
+   index_vec.v = _mm_cvttps_epi32(_mm_min_ps(v_max, _mm_max_ps(v_min, v_index))); 
+
+
+#define FETCH_EPILOGUE_CPY \
+   *buffer++ = g_data->color_table[index_vec.i[0]]; \
+   *buffer++ = g_data->color_table[index_vec.i[1]]; \
+   *buffer++ = g_data->color_table[index_vec.i[2]]; \
+   *buffer++ = g_data->color_table[index_vec.i[3]]; \
+}
+
+static void 
+loop_break(unsigned int *buffer, int length, int *lprealign, int *lby4 , int *lremaining)
+{
+  int l1=0,l2=0,l3=0;
+     while ((int)buffer & 0xF)
+        buffer++ , l1++;
+
+    if(length <= l1)
+      {
+        l1 = length;
+      }
+    else
+      {
+         l3 = (length - l1)%4;
+         l2 = length - l1 - l3 ;
+      }
+    *lprealign = l1;
+    *lby4 = l2;
+    *lremaining = l3;
+}
+
+static void 
+_radial_helper_sse3(uint *buffer, int length, Ector_Renderer_Software_Gradient_Data *g_data, float det,
+      float delta_det, float delta_delta_det, float b, float delta_b)
+    {
+        int lprealign, lby4, lremaining;
+        loop_break(buffer, length, &lprealign, &lby4, &lremaining);
+        // prealign loop
+        for (int i = 0 ; i < lprealign ; i++)
+          {
+             *buffer++ = _gradient_pixel(g_data, sqrt(det) - b);
+             det += delta_det;
+             delta_det += delta_delta_det;
+             b += delta_b;
+          }
+
+        // lby4 16byte align loop
+        vec4_f det_vec;
+        vec4_f delta_det4_vec;
+        vec4_f b_vec;
+
+        for (int i = 0; i < 4; ++i)
+          {
+             det_vec.f[i] = det;
+             delta_det4_vec.f[i] = 4 * delta_det;
+             b_vec.f[i] = b;
+
+             det += delta_det;
+             delta_det += delta_delta_det;
+             b += delta_b;
+          }
+
+        __m128 v_delta_delta_det16 = _mm_set1_ps(16 * delta_delta_det);
+        __m128 v_delta_delta_det6 = _mm_set1_ps(6 * delta_delta_det);
+        __m128 v_delta_b4 = _mm_set1_ps(4 * delta_b);
+
+#define FETCH_RADIAL_PROLOGUE \
+        for (int i = 0 ; i < lby4 ; i+=4) { \
+            __m128 v_index_local = _mm_sub_ps(_mm_sqrt_ps(det_vec.v), b_vec.v); \
+            __m128 v_index = _mm_add_ps(_mm_mul_ps(v_index_local, v_max), v_halff); \
+            det_vec.v = _mm_add_ps(_mm_add_ps(det_vec.v, delta_det4_vec.v), v_delta_delta_det6); \
+            delta_det4_vec.v = _mm_add_ps(delta_det4_vec.v, v_delta_delta_det16); \
+            b_vec.v = _mm_add_ps(b_vec.v, v_delta_b4);            
+
+
+#define FETCH_RADIAL_LOOP(FETCH_CLAMP) \
+        FETCH_RADIAL_PROLOGUE \
+        FETCH_CLAMP \
+        FETCH_EPILOGUE_CPY
+
+        FETCH_CLAMP_INIT_F
+        switch (g_data->gd->s) {
+        case EFL_GFX_GRADIENT_SPREAD_REPEAT:
+            FETCH_RADIAL_LOOP(FETCH_CLAMP_REPEAT_F)
+            break;
+        case EFL_GFX_GRADIENT_SPREAD_REFLECT:
+            FETCH_RADIAL_LOOP( FETCH_CLAMP_REFLECT_F)
+            break;
+        default:
+            FETCH_RADIAL_LOOP(FETCH_CLAMP_PAD_F)
+            break;
+        }
+
+
+        // remaining loop
+        for (int i = 0 ; i < lremaining ; i++)
+          *buffer++ = _gradient_pixel(g_data, sqrt(det_vec.f[i]) - b_vec.f[i]);
+}
+
+static void
+_linear_helper_sse3(uint *buffer, int length, Ector_Renderer_Software_Gradient_Data *g_data, int t, int inc)
+    {
+        int lprealign, lby4, lremaining;
+        loop_break(buffer, length, &lprealign, &lby4, &lremaining); 
+        // prealign loop
+        for (int i = 0 ; i < lprealign ; i++)
+          {
+             *buffer++ = _gradient_pixel_fixed(g_data, t);
+             t += inc;
+          }
+
+        // lby4 16byte align loop
+        vec4_i t_vec;
+        for (int i = 0; i < 4; ++i)
+          {
+             t_vec.i[i] = t;
+             t += inc;
+          }
+
+        __m128i v_inc = _mm_set1_epi32(4 * inc);
+        __m128i v_fxtpt_size = _mm_set1_epi32(FIXPT_SIZE * 0.5);
+
+        __m128i v_min = _mm_set1_epi32(0);
+        __m128i v_max = _mm_set1_epi32((GRADIENT_STOPTABLE_SIZE-1));
+
+        __m128i v_repeat_mask = _mm_set1_epi32(~((uint)(0xffffff) << GRADIENT_STOPTABLE_SIZE_SHIFT));
+        __m128i v_reflect_mask = _mm_set1_epi32(~((uint)(0xffffff) << (GRADIENT_STOPTABLE_SIZE_SHIFT+1)));
+
+        __m128i v_reflect_limit = _mm_set1_epi32(2 * GRADIENT_STOPTABLE_SIZE - 1);
+   
+
+#define FETCH_LINEAR_LOOP_PROLOGUE \
+        for (int i = 0 ; i < lby4 ; i+=4) { \
+            vec4_i index_vec;\
+            __m128i v_index;\
+            v_index =  _mm_srai_epi32(_mm_add_epi32(t_vec.v, v_fxtpt_size), FIXPT_BITS); \
+            t_vec.v = _mm_add_epi32(t_vec.v, v_inc);
+
+#define FETCH_LINEAR_LOOP_CLAMP_REPEAT \
+            index_vec.v = _mm_and_si128(v_repeat_mask, v_index);
+
+#define FETCH_LINEAR_LOOP_CLAMP_REFLECT \
+            __m128i v_index_i = _mm_and_si128(v_reflect_mask, v_index); \
+            __m128i v_index_i_inv = _mm_sub_epi32(v_reflect_limit, v_index_i); \
+            index_vec.v = _mm_min_epi16(v_index_i, v_index_i_inv);
+
+#define FETCH_LINEAR_LOOP_CLAMP_PAD \
+            index_vec.v = _mm_min_epi16(v_max, _mm_max_epi16(v_min, v_index));
+
+
+
+#define FETCH_LINEAR_LOOP(FETCH_LINEAR_LOOP_CLAMP) \
+        FETCH_LINEAR_LOOP_PROLOGUE \
+        FETCH_LINEAR_LOOP_CLAMP \
+        FETCH_EPILOGUE_CPY
+
+        switch (g_data->gd->s) {
+        case EFL_GFX_GRADIENT_SPREAD_REPEAT:
+            FETCH_LINEAR_LOOP(FETCH_LINEAR_LOOP_CLAMP_REPEAT)
+            break;
+        case EFL_GFX_GRADIENT_SPREAD_REFLECT:
+            FETCH_LINEAR_LOOP(FETCH_LINEAR_LOOP_CLAMP_REFLECT)
+            break;
+        default:
+            FETCH_LINEAR_LOOP(FETCH_LINEAR_LOOP_CLAMP_PAD)
+            break;
+        }
+
+        // remaining loop
+        for (int i = 0 ; i < lremaining ; i++)
+          *buffer++ = _gradient_pixel_fixed(g_data, t_vec.i[i]);
+}
+
+#endif
 
 typedef double (*BLEND_FUNC)(double progress);
 
@@ -124,7 +335,7 @@ _generate_gradient_color_table(Efl_Gfx_Gradient_Stop *gradient_stops, int stop_c
 void
 update_color_table(Ector_Renderer_Software_Gradient_Data *gdata)
 {
-   if(gdata->color_table) return;
+   if (gdata->color_table) return;
 
    gdata->color_table = malloc(GRADIENT_STOPTABLE_SIZE * 4);
    gdata->alpha = _generate_gradient_color_table(gdata->gd->colors, gdata->gd->colors_count, gdata->color_table, GRADIENT_STOPTABLE_SIZE);
@@ -137,6 +348,17 @@ destroy_color_table(Ector_Renderer_Software_Gradient_Data *gdata)
      {
         free(gdata->color_table);
         gdata->color_table = NULL;
+     }
+}
+
+inline static void
+_linear_helper_generic(uint *buffer, int length, Ector_Renderer_Software_Gradient_Data *g_data,
+                       int t_fixed, int inc_fixed)
+{
+   for (int i = 0 ; i < length ; i++)
+     {
+        *buffer++ = _gradient_pixel_fixed(g_data, t_fixed);
+        t_fixed += inc_fixed;
      }
 }
 
@@ -175,31 +397,23 @@ fetch_linear_gradient(uint *buffer, Span_Data *data, int y, int x, int length)
               // we can use fixed point math
               int t_fixed = (int)(t * FIXPT_SIZE);
               int inc_fixed = (int)(inc * FIXPT_SIZE);
-              // #ifdef BUILD_SSE3
-              // if (evas_common_cpu_has_feature(CPU_FEATURE_SSE3)) {
-              //     _fetch_linear_sse3(buffer, length, g_data, t_fixed, inc_fixed);
-              // } else
-              // #endif
-              {
-                 while (buffer < end)
-                   {
-                      *buffer++ = _gradient_pixel_fixed(g_data, t_fixed);
-                      t_fixed += inc_fixed;
-                   }
-              }
+              linear_helper(buffer, length, g_data, t_fixed, inc_fixed);
            }
          else
            {
               // we have to fall back to float math
-              while (buffer < end) {
-                 *buffer++ = _gradient_pixel(g_data, t/GRADIENT_STOPTABLE_SIZE);
-                 t += inc;
-              }
+              while (buffer < end)
+                {
+                   *buffer++ = _gradient_pixel(g_data, t/GRADIENT_STOPTABLE_SIZE);
+                   t += inc;
+                }
            }
       }
 }
 
-static void
+
+
+inline static void
 _radial_helper_generic(uint *buffer, int length, Ector_Renderer_Software_Gradient_Data *g_data, float det,
                        float delta_det, float delta_delta_det, float b, float delta_b)
 {
@@ -256,12 +470,20 @@ fetch_radial_gradient(uint *buffer, Span_Data *data, int y, int x, int length)
    float delta_det = (b_delta_b + delta_bb + 4 * g_data->radial.a * (rx_plus_ry + delta_rxrxryry)) * inv_a;
    const float delta_delta_det = (delta_b_delta_b + 4 * g_data->radial.a * delta_rx_plus_ry) * inv_a;
 
-   // #ifdef BUILD_SSE3
-   //    if (evas_common_cpu_has_feature(CPU_FEATURE_SSE3)) {
-   //        _radial_helper_sse3(buffer, length, g_data, det, delta_det, delta_delta_det, b, delta_b);
-   //    } else
-   // #endif
-   { // generic fallback
-      _radial_helper_generic(buffer, length, g_data, det, delta_det, delta_delta_det, b, delta_b);
-   }
+   radial_helper(buffer, length, g_data, det, delta_det, delta_delta_det, b, delta_b);
+}
+
+
+void
+init_drawhelper_gradient()
+{
+   radial_helper = _radial_helper_generic;
+   linear_helper = _linear_helper_generic;
+   #ifdef BUILD_SSE3
+   if (eina_cpu_features_get() & EINA_CPU_SSE3)
+     {
+        radial_helper = _radial_helper_sse3;
+        linear_helper = _linear_helper_sse3;
+     }
+   #endif
 }

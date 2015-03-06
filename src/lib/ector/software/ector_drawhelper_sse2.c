@@ -1,9 +1,8 @@
-#define NEED_SSE3 1
 
 #include <Ector.h>
 #include "ector_drawhelper_private.h"
 
-//#ifdef BUILD_SSE3
+#ifdef BUILD_SSE3
 #include <immintrin.h>
 
 // NOTE
@@ -383,16 +382,22 @@ comp_func_source_over_sse2(uint *dest, const uint *src, int length, uint color, 
      }
 }
 
+#endif
+
 void
 init_draw_helper_sse2()
 {
-   // update the comp_function table for solid color
-   func_for_mode_solid[ECTOR_ROP_COPY] = comp_func_solid_source_sse2;
-   func_for_mode_solid[ECTOR_ROP_BLEND] = comp_func_solid_source_over_sse2;
-   
-   // update the comp_function table for source data
-   func_for_mode[ECTOR_ROP_COPY] = comp_func_source_sse2;
-   func_for_mode[ECTOR_ROP_BLEND] = comp_func_source_over_sse2;
+#ifdef BUILD_SSE3
+   if (eina_cpu_features_get() & EINA_CPU_SSE2)
+     {
+        // update the comp_function table for solid color
+        func_for_mode_solid[ECTOR_ROP_COPY] = comp_func_solid_source_sse2;
+        func_for_mode_solid[ECTOR_ROP_BLEND] = comp_func_solid_source_over_sse2;
+
+        // update the comp_function table for source data
+        func_for_mode[ECTOR_ROP_COPY] = comp_func_source_sse2;
+        func_for_mode[ECTOR_ROP_BLEND] = comp_func_source_over_sse2;
+      }
+#endif
 }
 
-//#endif
