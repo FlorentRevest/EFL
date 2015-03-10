@@ -6,15 +6,9 @@
 #include <immintrin.h>
 
 // NOTE
-// a is already prepared for word multiplication, for performance
-// reason
-// ie
-// __m128i v_al = _mm_unpacklo_epi16(v_ialpha, v_ialpha);
-// __m128i v_ah = _mm_unpackhi_epi16(v_ialpha, v_ialpha);
-// __m128i a = (__m128i) _mm_shuffle_ps( (__m128)v_al, (__m128)v_ah, 0x88);
-//
+// a must be in the form of 00A100A1,00A200A2,00A300A3,00A400A4
 inline static __m128i
-v4_byte_mul_special_sse2(__m128i c, __m128i a)
+v4_byte_mul_sse2(__m128i c, __m128i a)
 {
    const __m128i ga_mask = _mm_set1_epi32(0x00FF00FF);
    const __m128i rb_mask = _mm_set1_epi32(0xFF00FF00);
@@ -30,33 +24,6 @@ v4_byte_mul_special_sse2(__m128i c, __m128i a)
    __m128i c1 = c;
    c1 = _mm_and_si128(ga_mask, c1);
    c1 = _mm_mullo_epi16(a, c1);
-   c1 = _mm_srli_epi32(c1, 8);
-   c1 = _mm_and_si128(ga_mask, c1);
-
-   /* combine */
-   return _mm_add_epi32(c0, c1);
-}
-
-inline static __m128i
-v4_byte_mul_sse2(__m128i c, __m128i a)
-{
-   const __m128i ga_mask = _mm_set1_epi32(0x00FF00FF);
-   const __m128i rb_mask = _mm_set1_epi32(0xFF00FF00);
-   __m128i v_al = _mm_unpacklo_epi16(a, a);
-   __m128i v_ah = _mm_unpackhi_epi16(a, a);
-   __m128i v_a = (__m128i) _mm_shuffle_ps( (__m128)v_al, (__m128)v_ah, 0x88);
-
-   /* first half of calc */
-   __m128i c0 = c;
-   c0 = _mm_srli_epi32(c0, 8);
-   c0 = _mm_and_si128(ga_mask, c0);
-   c0 = _mm_mullo_epi16(v_a, c0);
-   c0 = _mm_and_si128(rb_mask, c0);
-
-   /* second half of calc */
-   __m128i c1 = c;
-   c1 = _mm_and_si128(ga_mask, c1);
-   c1 = _mm_mullo_epi16(v_a, c1);
    c1 = _mm_srli_epi32(c1, 8);
    c1 = _mm_and_si128(ga_mask, c1);
 
@@ -152,12 +119,7 @@ inline static void
 comp_func_helper_sse2 (uint *dest, int length, uint color, uint alpha)
 {
    const __m128i v_color = _mm_set1_epi32(color);
-   const __m128i v_ialpha = _mm_set1_epi32(alpha);
-
-   /* prepare alpha for word multiplication */
-   __m128i v_al = _mm_unpacklo_epi16(v_ialpha, v_ialpha);
-   __m128i v_ah = _mm_unpackhi_epi16(v_ialpha, v_ialpha);
-   __m128i v_a = (__m128i) _mm_shuffle_ps( (__m128)v_al, (__m128)v_ah, 0x88);
+   const __m128i v_a = _mm_set1_epi16(alpha);
 
    LOOP_ALIGNED_U1_A4(dest, length,
       { /* UOP */
@@ -169,7 +131,7 @@ comp_func_helper_sse2 (uint *dest, int length, uint color, uint alpha)
 
          __m128i v_dest = _mm_load_si128((__m128i *)dest);
 
-         v_dest = v4_byte_mul_special_sse2(v_dest, v_a);
+         v_dest = v4_byte_mul_sse2(v_dest, v_a);
          v_dest = _mm_add_epi32(v_dest, v_color);
 
          _mm_store_si128((__m128i *)dest, v_dest);
@@ -226,6 +188,7 @@ comp_func_solid_source_over_sse2(uint *dest, int length, uint color, uint const_
 // dest = src + dest * sia
 #define V4_COMP_OP_SRC_OVER \
   __m128i v_sia = v4_ialpha_sse2(v_src); \
+  v_sia = _mm_add_epi32(v_sia, _mm_slli_epi32(v_sia, 16)); \
   v_dest = v4_byte_mul_sse2(v_dest, v_sia); \
   v_src = _mm_add_epi32(v_src, v_dest);
 
@@ -322,7 +285,7 @@ comp_func_source_over_sse2(uint *dest, const uint *src, int length, uint color, 
          }
         else
          {
-            __m128i v_alpha = _mm_set1_epi32(const_alpha);
+            __m128i v_alpha = _mm_set1_epi16(const_alpha);
             LOOP_ALIGNED_U1_A4(dest, length,
               { /* UOP */
                  uint s = BYTE_MUL(*src, const_alpha);
@@ -361,7 +324,7 @@ comp_func_source_over_sse2(uint *dest, const uint *src, int length, uint color, 
           }
         else
           {
-             __m128i v_alpha = _mm_set1_epi32(const_alpha);
+             __m128i v_alpha = _mm_set1_epi16(const_alpha);
              LOOP_ALIGNED_U1_A4(dest, length,
                { /* UOP */
                   uint s = ECTOR_MUL4_SYM(*src, color);
