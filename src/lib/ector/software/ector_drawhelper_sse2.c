@@ -5,30 +5,27 @@
 #ifdef BUILD_SSE3
 #include <immintrin.h>
 
-// NOTE
-// a must be in the form of 00A100A1,00A200A2,00A300A3,00A400A4
+// Each 32bits components of alphaChannel must be in the form 0x00AA00AA
 inline static __m128i
 v4_byte_mul_sse2(__m128i c, __m128i a)
 {
-   const __m128i ga_mask = _mm_set1_epi32(0x00FF00FF);
-   const __m128i rb_mask = _mm_set1_epi32(0xFF00FF00);
+   const __m128i ag_mask = _mm_set1_epi32(0xFF00FF00);
+   const __m128i rb_mask = _mm_set1_epi32(0x00FF00FF);
 
-   /* first half of calc */
-   __m128i c0 = c;
-   c0 = _mm_srli_epi32(c0, 8);
-   c0 = _mm_and_si128(ga_mask, c0);
-   c0 = _mm_mullo_epi16(a, c0);
-   c0 = _mm_and_si128(rb_mask, c0);
+   /* for AG */
+   __m128i v_ag = _mm_and_si128(ag_mask, c);
+   v_ag = _mm_srli_epi32(v_ag, 8);
+   v_ag = _mm_mullo_epi16(a, v_ag);
+   v_ag = _mm_and_si128(ag_mask, v_ag);
 
-   /* second half of calc */
-   __m128i c1 = c;
-   c1 = _mm_and_si128(ga_mask, c1);
-   c1 = _mm_mullo_epi16(a, c1);
-   c1 = _mm_srli_epi32(c1, 8);
-   c1 = _mm_and_si128(ga_mask, c1);
+   /* for RB */
+   __m128i v_rb = _mm_and_si128(rb_mask, c);
+   v_rb = _mm_mullo_epi16(a, v_rb);
+   v_rb = _mm_srli_epi32(v_rb, 8);
+   v_rb = _mm_and_si128(rb_mask, v_rb);
 
    /* combine */
-   return _mm_add_epi32(c0, c1);
+   return _mm_add_epi32(v_ag, v_rb);
 }
 
 static inline __m128i
