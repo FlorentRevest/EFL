@@ -85,8 +85,8 @@ v4_interpolate_color_sse2(__m128i a, __m128i c0, __m128i c1)
 }
 
 static inline __m128i
-v4_mul_color_sse2(__m128i x, __m128i y) {
-
+v4_mul_color_sse2(__m128i x, __m128i y)
+{
    const __m128i zero = _mm_setzero_si128();
    const __m128i sym4_mask = _mm_set_epi32(0x00FF00FF, 0x000000FF, 0x00FF00FF, 0x000000FF);
    __m128i x_l = _mm_unpacklo_epi8(x, zero);
@@ -123,12 +123,10 @@ comp_func_helper_sse2 (uint *dest, int length, uint color, uint alpha)
 
    LOOP_ALIGNED_U1_A4(dest, length,
       { /* UOP */
-
          *dest = color + BYTE_MUL(*dest, alpha);
          dest++; length--;
       },
       { /* A4OP */
-
          __m128i v_dest = _mm_load_si128((__m128i *)dest);
 
          v_dest = v4_byte_mul_sse2(v_dest, v_a);
@@ -206,22 +204,21 @@ comp_func_source_sse2(uint *dest, const uint *src, int length, uint color, uint 
         if (const_alpha == 255)
           memcpy(dest, src, length * sizeof(uint));
         else
-         {
-            int ialpha = 255 - const_alpha;
-            __m128i v_alpha = _mm_set1_epi32(const_alpha);
-            LOOP_ALIGNED_U1_A4(dest, length,
-              { /* UOP */
-
-                 *dest = INTERPOLATE_PIXEL_256(*src, const_alpha, *dest, ialpha);
-                 dest++; src++; length--;
-              },
-              { /* A4OP */
-                V4_FETCH_SRC_DEST
-                V4_COMP_OP_SRC
-                V4_STORE_DEST
-                V4_SRC_DEST_LEN_INC
-              })
-         }
+          {
+             int ialpha = 255 - const_alpha;
+             __m128i v_alpha = _mm_set1_epi32(const_alpha);
+             LOOP_ALIGNED_U1_A4(dest, length,
+               { /* UOP */
+                  *dest = INTERPOLATE_PIXEL_256(*src, const_alpha, *dest, ialpha);
+                  dest++; src++; length--;
+               },
+               { /* A4OP */
+                  V4_FETCH_SRC_DEST
+                  V4_COMP_OP_SRC
+                  V4_STORE_DEST
+                  V4_SRC_DEST_LEN_INC
+               })
+          }
      }
    else
      {
@@ -230,7 +227,6 @@ comp_func_source_sse2(uint *dest, const uint *src, int length, uint color, uint 
           {
              LOOP_ALIGNED_U1_A4(dest, length,
                { /* UOP */
-
                   *dest = ECTOR_MUL4_SYM(*src, color);
                   dest++; src++; length--;
                },
@@ -268,39 +264,39 @@ comp_func_source_over_sse2(uint *dest, const uint *src, int length, uint color, 
    if (color == 0xffffffff) // No color multiplier
      {
         if (const_alpha == 255)
-         {
-            LOOP_ALIGNED_U1_A4(dest, length,
-              { /* UOP */
-                 uint s = *src;
-                 uint sia = Alpha(~s);
-                 *dest = s + BYTE_MUL(*dest, sia);
-                 dest++; src++; length--;
-              },
-              { /* A4OP */
+          {
+             LOOP_ALIGNED_U1_A4(dest, length,
+               { /* UOP */
+                  uint s = *src;
+                  uint sia = Alpha(~s);
+                  *dest = s + BYTE_MUL(*dest, sia);
+                  dest++; src++; length--;
+               },
+               { /* A4OP */
                   V4_FETCH_SRC_DEST
                   V4_COMP_OP_SRC_OVER
                   V4_STORE_DEST
                   V4_SRC_DEST_LEN_INC
-              })
-         }
+               })
+          }
         else
-         {
-            __m128i v_alpha = _mm_set1_epi16(const_alpha);
-            LOOP_ALIGNED_U1_A4(dest, length,
-              { /* UOP */
-                 uint s = BYTE_MUL(*src, const_alpha);
-                 uint sia = Alpha(~s);
-                 *dest = s + BYTE_MUL(*dest, sia);
-                 dest++; src++; length--;
-              },
-              { /* A4OP */
+          {
+             __m128i v_alpha = _mm_set1_epi16(const_alpha);
+             LOOP_ALIGNED_U1_A4(dest, length,
+               { /* UOP */
+                  uint s = BYTE_MUL(*src, const_alpha);
+                  uint sia = Alpha(~s);
+                  *dest = s + BYTE_MUL(*dest, sia);
+                  dest++; src++; length--;
+               },
+               { /* A4OP */
                   V4_FETCH_SRC_DEST
                   V4_ALPHA_MULTIPLY
                   V4_COMP_OP_SRC_OVER
                   V4_STORE_DEST
                   V4_SRC_DEST_LEN_INC
-              })
-         }
+               })
+          }
      }
    else
      {
