@@ -1,15 +1,6 @@
-#ifdef HAVE_CONFIG_H
-# include "config.h"
-#endif
-
-//Remove
 #include <assert.h>
-
 #include <math.h>
-#include <float.h>
 
-#include <Eina.h>
-#include <Ector.h>
 #include <software/Ector_Software.h>
 
 #include "ector_private.h"

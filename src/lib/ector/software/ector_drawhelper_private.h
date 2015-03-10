@@ -1,6 +1,10 @@
 #ifndef ECTOR_DRAWHELPER_PRIVATE_H
 #define ECTOR_DRAWHELPER_PRIVATE_H
 
+#ifdef HAVE_CONFIG_H
+# include <config.h>
+#endif
+
 #ifndef MIN
 #define MIN( a, b )  ( (a) < (b) ? (a) : (b) )
 #endif
