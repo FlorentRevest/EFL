@@ -193,6 +193,72 @@ static void _outline_transform(Outline *outline, Eina_Matrix3 *m)
      }
 }
 
+static Eina_Bool
+_parse_commands(const Efl_Gfx_Path_Command *cmds, const double *pts, Outline * outline)
+{
+   Eina_Bool close_path = EINA_FALSE; 
+   for (; *cmds != EFL_GFX_PATH_COMMAND_TYPE_END; cmds++)
+     {
+        switch (*cmds)
+          {
+            case EFL_GFX_PATH_COMMAND_TYPE_MOVE_TO:
+
+               _outline_move_to(outline, pts[0], pts[1]);
+
+               pts += 2;
+               break;
+            case EFL_GFX_PATH_COMMAND_TYPE_LINE_TO:
+
+               _outline_line_to(outline, pts[0], pts[1]);
+
+               pts += 2;
+               break;
+            case EFL_GFX_PATH_COMMAND_TYPE_CUBIC_TO:
+
+               // Be careful, we do have a different order than
+               // cairo, first is destination point, followed by
+               // the control point. The opposite of cairo.
+               _outline_cubic_to(outline,
+                                 pts[2], pts[3], pts[4], pts[5], // control points
+                                 pts[0], pts[1]); // destination point
+               pts += 6;
+               break;
+
+            case EFL_GFX_PATH_COMMAND_TYPE_CLOSE:
+
+               close_path = _outline_close_path(outline);
+               break;
+
+            case EFL_GFX_PATH_COMMAND_TYPE_LAST:
+            case EFL_GFX_PATH_COMMAND_TYPE_END:
+               break;
+          }
+     }
+   _outline_end(outline);
+   return close_path;
+}
+
+static Eina_Bool
+_generate_stroke_data(Ector_Renderer_Software_Shape_Data *pd)
+{
+   if (pd->outline_data) return EINA_FALSE;
+
+   if (!pd->shape->stroke.fill &&
+       ((pd->shape->stroke.color.a == 0) || pd->shape->stroke.width < 0.01))
+     return EINA_FALSE;
+
+   return EINA_TRUE;
+}
+
+static Eina_Bool
+_generate_shape_data(Ector_Renderer_Software_Shape_Data *pd)
+{
+   if (pd->shape_data) return EINA_FALSE;
+
+   if (!pd->shape->fill && (pd->base->color.a == 0)) return EINA_FALSE;
+
+   return EINA_TRUE;
+}
 
 static Eina_Bool
 _ector_renderer_software_shape_ector_renderer_generic_base_prepare(Eo *obj, Ector_Renderer_Software_Shape_Data *pd)
@@ -219,61 +285,24 @@ _ector_renderer_software_shape_ector_renderer_generic_base_prepare(Eo *obj, Ecto
      }
 
    eo_do(obj, efl_gfx_shape_path_get(&cmds, &pts));
-   if (!pd->shape_data && cmds)
+   if (cmds && (_generate_stroke_data(pd) || _generate_shape_data(pd)))
      {
-        Eina_Bool close_path = EINA_FALSE;
+        Eina_Bool close_path;
         Outline * outline = _outline_create();
-
-        for (; *cmds != EFL_GFX_PATH_COMMAND_TYPE_END; cmds++)
-          {
-             switch (*cmds)
-               {
-                case EFL_GFX_PATH_COMMAND_TYPE_MOVE_TO:
-
-                   _outline_move_to(outline, pts[0], pts[1]);
-
-                   pts += 2;
-                   break;
-                case EFL_GFX_PATH_COMMAND_TYPE_LINE_TO:
-
-                   _outline_line_to(outline, pts[0], pts[1]);
-
-                   pts += 2;
-                   break;
-                case EFL_GFX_PATH_COMMAND_TYPE_CUBIC_TO:
-
-                   // Be careful, we do have a different order than
-                   // cairo, first is destination point, followed by
-                   // the control point. The opposite of cairo.
-                   _outline_cubic_to(outline,
-                                     pts[2], pts[3], pts[4], pts[5], // control points
-                                     pts[0], pts[1]); // destination point
-                   pts += 6;
-                   break;
-
-                case EFL_GFX_PATH_COMMAND_TYPE_CLOSE:
-
-                   close_path = _outline_close_path(outline);
-                   break;
-
-                case EFL_GFX_PATH_COMMAND_TYPE_LAST:
-                case EFL_GFX_PATH_COMMAND_TYPE_END:
-                   break;
-               }
-          }
-
-        _outline_end(outline);
+        close_path = _parse_commands(cmds, pts, outline);
         _outline_transform(outline, pd->base->m);
 
-        // generate the shape data.
-        pd->shape_data = ector_software_rasterizer_generate_rle_data(pd->surface->software, &outline->ft_outline);
-        if (!pd->outline_data)
+        //shape data generation 
+        if (_generate_shape_data(pd))
+         pd->shape_data = ector_software_rasterizer_generate_rle_data(pd->surface->software, &outline->ft_outline);
+
+        //stroke data generation
+        if (_generate_stroke_data(pd))
           {
              ector_software_rasterizer_stroke_set(pd->surface->software, (pd->shape->stroke.width * pd->shape->stroke.scale), pd->shape->stroke.cap,
                                                   pd->shape->stroke.join);
              pd->outline_data = ector_software_rasterizer_generate_stroke_rle_data(pd->surface->software, &outline->ft_outline, close_path);
           }
-
         _outline_destroy(outline);
      }
 
