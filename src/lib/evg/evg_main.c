@@ -22,6 +22,11 @@
 #include <Evg.h>
 #include "evg_private.h"
 
+typedef struct _Evg Evg;
+struct _Evg
+{
+};
+
 int _evg_log_dom_global = 0;
 
 static int _evg_main_count = 0;
@@ -79,3 +84,65 @@ evg_shutdown(void)
    eina_shutdown();
    return _evg_main_count;
 }
+
+static void
+_efl_vg_loader_start_set(Eo *obj, Evg *pd, const Efl_VG_Container *tree)
+{
+}
+
+static const Efl_VG_Container *
+_efl_vg_loader_start_get(Eo *obj, Evg *pd)
+{
+}
+
+static void
+_efl_vg_loader_end_set(Eo *obj, Evg *pd, const Efl_VG_Container *tree)
+{
+}
+
+static const Efl_VG_Container *
+_efl_vg_loader_end_get(Eo *obj, Evg *pd)
+{
+}
+
+static void
+_efl_vg_loader_interpolation_set(Eo *obj, Evg *pd, double pos)
+{
+}
+
+static double
+_efl_vg_loader_interpolation_get(Eo *obj, Evg *pd)
+{
+}
+
+static Eo_Base *
+_efl_vg_loader_eo_base_constructor(Eo *obj, Evg *pd)
+{
+}
+
+static void
+_efl_vg_loader_eo_base_destructor(Eo *obj, Evg *pd)
+{
+}
+
+static Eina_Bool
+_efl_vg_loader_efl_file_file_set(Eo *obj, Evg *pd, const char *file, const char *key)
+{
+}
+
+static void
+_efl_vg_loader_efl_file_file_get(Eo *obj, Evg *pd, const char **file, const char **key)
+{
+}
+
+static Eina_Bool
+_efl_vg_loader_efl_file_mmap_set(Eo *obj, Evg *pd, const Eina_File *f, const char *key)
+{
+}
+
+static void
+_efl_vg_loader_efl_file_mmap_get(Eo *obj, Evg *pd, const Eina_File **f, const char **key)
+{
+}
+
+#include "efl_vg_loader.eo.c"

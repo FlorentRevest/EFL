@@ -1,8 +1,7 @@
 
 ### Library
 
-evg_eolian_files =
-#	lib/evg/evg_object.eo
+evg_eolian_files = lib/evg/efl_vg_loader.eo
 
 evg_eolian_c = $(evg_eolian_files:%.eo=%.eo.c)
 evg_eolian_h = $(evg_eolian_files:%.eo=%.eo.h) \

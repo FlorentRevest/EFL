@@ -64,6 +64,9 @@ EAPI int evg_init(void);
  */
 EAPI int evg_shutdown(void);
 
+#include <efl_vg_loader.eo.h>
+#include <efl_vg_loader.eo.legacy.h>
+
 #endif
 
 /**

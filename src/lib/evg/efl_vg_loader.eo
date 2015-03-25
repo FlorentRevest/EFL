@@ -1,0 +1,43 @@
+class Efl.VG.Loader (Efl.VG.Container, Efl.File)
+{
+   legacy_prefix: evg_object;
+   eo_prefix: evg_obj;
+   data: Evg;
+   methods {
+      @property start {
+         set {
+         }
+         get {
+         }
+         values {
+            tree: const(Efl.VG.Container)*;
+         }
+      }
+      @property end {
+         set {
+         }
+         get {
+         }
+         values {
+            tree: const(Efl.VG.Container)*;
+         }
+      }
+      @property interpolation {
+         set {
+         }
+         get {
+         }
+         values {
+            pos: double;
+         }
+      }
+   }
+   implements {
+      Eo.Base.constructor;
+      Eo.Base.destructor;
+      Efl.File.file.set;
+      Efl.File.file.get;
+      Efl.File.mmap.set;
+      Efl.File.mmap.get;
+   }
+}
