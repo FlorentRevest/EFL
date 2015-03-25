@@ -4192,6 +4192,49 @@ EFL_EVAL_PKGS([EPHYSICS])
 EFL_LIB_END_OPTIONAL([EPhysics])
 #### End of EPhysics
 
+#### Evg
+
+EFL_LIB_START([Evg])
+
+
+### Default values
+
+### Additional options to configure
+
+### Checks for programs
+
+### Checks for libraries
+
+## Compatibility layers
+
+EFL_PLATFORM_DEPEND([EVG], [evil])
+
+EFL_INTERNAL_DEPEND_PKG([EVG], [eina])
+EFL_INTERNAL_DEPEND_PKG([EVG], [eo])
+EFL_INTERNAL_DEPEND_PKG([EVG], [efl])
+EFL_INTERNAL_DEPEND_PKG([EVG], [evas])
+
+EFL_ADD_LIBS([EVG], [-lm])
+
+EFL_EVAL_PKGS([EVG])
+
+### Checks for header files
+
+### Checks for types
+
+### Checks for structures
+
+### Checks for compiler characteristics
+
+### Checks for linker characteristics
+
+### Checks for library functions
+
+### Check availability
+
+EFL_LIB_END([EVG])
+
+#### End of Evg
 
 #### Edje
 EFL_LIB_START([Edje])
@@ -4739,6 +4782,7 @@ pc/ecore-audio-cxx.pc
 pc/ecore-avahi.pc
 pc/ecore-buffer.pc
 pc/ector.pc
+pc/evg.pc
 pc/embryo.pc
 pc/eio.pc
 pc/eio-cxx.pc
@@ -4912,6 +4956,7 @@ echo "Ecore_Evas......: yes (${features_ecore_evas})"
 echo "Ector...........: yes"
 echo "Eeze............: ${efl_lib_optional_eeze} (${features_eeze})"
 echo "EPhysics........: ${efl_lib_optional_ephysics}"
+echo "Evg.............: yes"
 echo "Edje............: yes (${features_edje})"
 echo "Emotion.........: yes (${features_emotion})"
 echo "Ethumb..........: yes"

@@ -1,0 +1,23 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+modules=@libdir@/evg/modules
+module_arch=@MODULE_ARCH@
+includedir=@includedir@
+datarootdir=@datarootdir@
+datadir=@datadir@/evg
+vmaj=@VMAJ@
+vmin=@VMIN@
+vmic=@VMIC@
+multisense=@want_multisense@
+physics=@want_physics@
+eoincludedir=@datadir@/eolian/include
+eolian_flags=-I${eoincludedir}/evg-@VMAJ@
+
+Name: evg
+Description: Enlightened graphical design and layout engine.
+Requires.private: @requirements_pc_evg@
+Version: @VERSION@
+Libs: -L${libdir} -levg
+Libs.private: @requirements_libs_evg@
+Cflags: -I${includedir}/efl-@VMAJ@ -I${includedir}/evg-@VMAJ@

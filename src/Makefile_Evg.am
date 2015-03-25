@@ -1,0 +1,53 @@
+
+### Library
+
+evg_eolian_files =
+#	lib/evg/evg_object.eo
+
+evg_eolian_c = $(evg_eolian_files:%.eo=%.eo.c)
+evg_eolian_h = $(evg_eolian_files:%.eo=%.eo.h) \
+                $(evg_eolian_files:%.eo=%.eo.legacy.h)
+
+BUILT_SOURCES += \
+                 $(evg_eolian_c) \
+                 $(evg_eolian_h)
+
+CLEANFILES += \
+              $(evg_eolian_c) \
+              $(evg_eolian_h)
+
+evgeolianfilesdir = $(datadir)/eolian/include/evg-@VMAJ@
+evgeolianfiles_DATA = \
+                       $(evg_eolian_files)
+
+EXTRA_DIST += \
+              ${evgeolianfiles_DATA}
+
+lib_LTLIBRARIES += lib/evg/libevg.la
+
+EVG_COMMON_CPPFLAGS = -I$(top_builddir)/src/lib/efl \
+-I$(top_builddir) \
+-I$(top_srcdir)/src/lib/evg \
+-I$(top_builddir)/src/lib/evg \
+-DPACKAGE_BIN_DIR=\"$(bindir)\" \
+-DPACKAGE_LIB_DIR=\"$(libdir)\" \
+-DPACKAGE_DATA_DIR=\"$(datadir)/evg\" \
+-DPACKAGE_BUILD_DIR=\"$(abs_top_builddir)\" \
+-DPACKAGE_SRC_DIR=\"$(abs_top_srcdir)\" \
+@EVG_CFLAGS@
+
+installed_evgmainheadersdir = $(includedir)/evg-@VMAJ@
+dist_installed_evgmainheaders_DATA = \
+lib/evg/Evg.h
+
+nodist_installed_evgmainheaders_DATA = \
+                                        $(evg_eolian_h)
+
+lib_evg_libevg_la_SOURCES = \
+lib/evg/evg_private.h \
+lib/evg/evg_main.c
+
+lib_evg_libevg_la_CPPFLAGS = -I$(top_builddir)/src/lib/efl $(EVG_COMMON_CPPFLAGS)
+lib_evg_libevg_la_LIBADD = @EVG_LIBS@
+lib_evg_libevg_la_DEPENDENCIES = @EVG_INTERNAL_LIBS@
+lib_evg_libevg_la_LDFLAGS = @EFL_LTLIBRARY_FLAGS@
