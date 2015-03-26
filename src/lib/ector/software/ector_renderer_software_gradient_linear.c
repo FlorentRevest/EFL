@@ -13,7 +13,6 @@
 static void
 _update_linear_data(Ector_Renderer_Software_Gradient_Data *gdata)
 {
-   update_color_table(gdata);
    gdata->linear.x1 = gdata->gld->start.x;
    gdata->linear.y1 = gdata->gld->start.y;
 
@@ -66,6 +65,8 @@ static Eina_Bool
 _ector_renderer_software_gradient_linear_ector_renderer_software_base_fill(Eo *obj EINA_UNUSED,
                                                                            Ector_Renderer_Software_Gradient_Data *pd)
 {
+   // lazy creation of color table
+   update_color_table(pd);
    ector_software_rasterizer_linear_gradient_set(pd->surface->software, pd);
 
    return EINA_TRUE;

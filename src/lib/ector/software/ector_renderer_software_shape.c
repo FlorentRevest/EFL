@@ -260,30 +260,11 @@ _generate_shape_data(Ector_Renderer_Software_Shape_Data *pd)
    return EINA_TRUE;
 }
 
-static Eina_Bool
-_ector_renderer_software_shape_ector_renderer_generic_base_prepare(Eo *obj, Ector_Renderer_Software_Shape_Data *pd)
+static void 
+_update_rle(Eo *obj, Ector_Renderer_Software_Shape_Data *pd)
 {
    const Efl_Gfx_Path_Command *cmds = NULL;
    const double *pts = NULL;
-
-   // FIXME: shouldn't that be part of the shape generic implementation ?
-   if (pd->shape->fill)
-     eo_do(pd->shape->fill, ector_renderer_prepare());
-   if (pd->shape->stroke.fill)
-     eo_do(pd->shape->stroke.fill, ector_renderer_prepare());
-   if (pd->shape->stroke.marker)
-     eo_do(pd->shape->stroke.marker, ector_renderer_prepare());
-
-   // shouldn't that be moved to the software base object
-   if (!pd->surface)
-     {
-        Eo *parent;
-        eo_do(obj, parent = eo_parent_get());
-        if (!parent) return EINA_FALSE;
-        pd->surface = eo_data_xref(parent, ECTOR_SOFTWARE_SURFACE_CLASS, obj);
-        if (!pd->surface) return EINA_FALSE;
-     }
-
    eo_do(obj, efl_gfx_shape_path_get(&cmds, &pts));
    if (cmds && (_generate_stroke_data(pd) || _generate_shape_data(pd)))
      {
@@ -305,14 +286,38 @@ _ector_renderer_software_shape_ector_renderer_generic_base_prepare(Eo *obj, Ecto
           }
         _outline_destroy(outline);
      }
+}
 
+static Eina_Bool
+_ector_renderer_software_shape_ector_renderer_generic_base_prepare(Eo *obj, Ector_Renderer_Software_Shape_Data *pd)
+{
+   // FIXME: shouldn't that be part of the shape generic implementation ?
+   if (pd->shape->fill)
+     eo_do(pd->shape->fill, ector_renderer_prepare());
+   if (pd->shape->stroke.fill)
+     eo_do(pd->shape->stroke.fill, ector_renderer_prepare());
+   if (pd->shape->stroke.marker)
+     eo_do(pd->shape->stroke.marker, ector_renderer_prepare());
+
+   // shouldn't that be moved to the software base object
+   if (!pd->surface)
+     {
+        Eo *parent;
+        eo_do(obj, parent = eo_parent_get());
+        if (!parent) return EINA_FALSE;
+        pd->surface = eo_data_xref(parent, ECTOR_SOFTWARE_SURFACE_CLASS, obj);
+        if (!pd->surface) return EINA_FALSE;
+     }
    return EINA_TRUE;
 }
 
 static Eina_Bool
-_ector_renderer_software_shape_ector_renderer_generic_base_draw(Eo *obj EINA_UNUSED, Ector_Renderer_Software_Shape_Data *pd, Ector_Rop op, Eina_Array *clips, unsigned int mul_col)
+_ector_renderer_software_shape_ector_renderer_generic_base_draw(Eo *obj, Ector_Renderer_Software_Shape_Data *pd, Ector_Rop op, Eina_Array *clips, unsigned int mul_col)
 {
    int x, y;
+
+   // do lazy creation of rle
+   _update_rle(obj, pd);
 
    // adjust the offset
    x = pd->surface->x + (int)pd->base->origin.x;
