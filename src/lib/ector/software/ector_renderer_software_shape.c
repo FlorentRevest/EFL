@@ -30,18 +30,35 @@ typedef struct _Outline
    int contours_alloc;
 }Outline;
 
+
+static inline void
+_grow_outline_contour(Outline *outline, int num)
+{
+   if ( outline->ft_outline.n_contours + num > outline->contours_alloc)
+     {
+        outline->contours_alloc += 5;
+        outline->ft_outline.contours = (short *) calloc(outline->contours_alloc, sizeof(short));
+     }
+}
+
+static inline void
+_grow_outline_points(Outline *outline, int num)
+{
+   if ( outline->ft_outline.n_points + num > outline->points_alloc)
+     {
+        outline->points_alloc += 50;
+        outline->ft_outline.points = (SW_FT_Vector *) calloc(outline->points_alloc, sizeof(SW_FT_Vector));
+        outline->ft_outline.tags = (char *) calloc(outline->points_alloc, sizeof(char));
+     }
+}
 static Outline *
 _outline_create()
 {
    Outline *outline = (Outline *) calloc(1, sizeof(Outline));
-
-   outline->ft_outline.points = (SW_FT_Vector *) calloc(50, sizeof(SW_FT_Vector));
-   outline->ft_outline.tags = (char *) calloc(50, sizeof(char));
-
-   outline->ft_outline.contours = (short *) calloc(5, sizeof(short));
-
-   outline->points_alloc = 50;
-   outline->contours_alloc = 5;
+   outline->points_alloc = 0;
+   outline->contours_alloc = 0;
+   _grow_outline_contour(outline, 1);
+   _grow_outline_points(outline, 1);
    return outline;
 }
 
@@ -63,17 +80,14 @@ _outline_move_to(Outline *outline, double x, double y)
 {
    SW_FT_Outline *ft_outline = &outline->ft_outline;
 
-   if (ft_outline->n_contours == outline->contours_alloc)
-     {
-        outline->contours_alloc += 5;
-        ft_outline->contours = (short *) realloc(ft_outline->contours, outline->contours_alloc * sizeof(short));
-     }
+   _grow_outline_points(outline, 1);
    ft_outline->points[ft_outline->n_points].x = x;
    ft_outline->points[ft_outline->n_points].y = y;
    ft_outline->tags[ft_outline->n_points] = SW_FT_CURVE_TAG_ON;
 
    if (ft_outline->n_points)
      {
+        _grow_outline_contour(outline, 1);
         ft_outline->contours[ft_outline->n_contours] = ft_outline->n_points - 1;
         ft_outline->n_contours++;
      }
@@ -86,11 +100,7 @@ _outline_end(Outline *outline)
 {
    SW_FT_Outline *ft_outline = &outline->ft_outline;
 
-   if (ft_outline->n_contours == outline->contours_alloc)
-     {
-        outline->contours_alloc += 1;
-        ft_outline->contours = (short *) realloc(ft_outline->contours, outline->contours_alloc * sizeof(short));
-     }
+   _grow_outline_contour(outline, 1);
 
    if (ft_outline->n_points)
      {
@@ -104,12 +114,7 @@ static void  _outline_line_to(Outline *outline, double x, double y)
 {
    SW_FT_Outline *ft_outline = &outline->ft_outline;
 
-   if (ft_outline->n_points == outline->points_alloc)
-     {
-        outline->points_alloc += 50;
-        ft_outline->points = (SW_FT_Vector *) realloc(ft_outline->points, outline->points_alloc * sizeof(SW_FT_Vector));
-        ft_outline->tags = (char *) realloc(ft_outline->tags, outline->points_alloc * sizeof(char));
-     }
+   _grow_outline_points(outline, 1);
    ft_outline->points[ft_outline->n_points].x = x;
    ft_outline->points[ft_outline->n_points].y = y;
    ft_outline->tags[ft_outline->n_points] = SW_FT_CURVE_TAG_ON;
@@ -145,12 +150,7 @@ static void  _outline_cubic_to(Outline *outline, double cx1, double cy1, double 
 {
    SW_FT_Outline *ft_outline = &outline->ft_outline;
 
-   if (ft_outline->n_points == outline->points_alloc)
-     {
-        outline->points_alloc += 50;
-        ft_outline->points = (SW_FT_Vector *) realloc(ft_outline->points, outline->points_alloc * sizeof(SW_FT_Vector));
-        ft_outline->tags = (char *) realloc(ft_outline->tags, outline->points_alloc * sizeof(char));
-     }
+   _grow_outline_points(outline, 3);
 
    ft_outline->points[ft_outline->n_points].x = cx1;
    ft_outline->points[ft_outline->n_points].y = cy1;
