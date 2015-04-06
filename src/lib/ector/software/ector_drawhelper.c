@@ -1,3 +1,6 @@
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
 #include <Ector.h>
 #include "ector_drawhelper_private.h"
