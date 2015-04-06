@@ -37,7 +37,7 @@ _grow_outline_contour(Outline *outline, int num)
    if ( outline->ft_outline.n_contours + num > outline->contours_alloc)
      {
         outline->contours_alloc += 5;
-        outline->ft_outline.contours = (short *) calloc(outline->contours_alloc, sizeof(short));
+        outline->ft_outline.contours = (short *) realloc(outline->ft_outline.contours, outline->contours_alloc * sizeof(short));
      }
 }
 
@@ -47,8 +47,8 @@ _grow_outline_points(Outline *outline, int num)
    if ( outline->ft_outline.n_points + num > outline->points_alloc)
      {
         outline->points_alloc += 50;
-        outline->ft_outline.points = (SW_FT_Vector *) calloc(outline->points_alloc, sizeof(SW_FT_Vector));
-        outline->ft_outline.tags = (char *) calloc(outline->points_alloc, sizeof(char));
+        outline->ft_outline.points = (SW_FT_Vector *) realloc(outline->ft_outline.points, outline->points_alloc * sizeof(SW_FT_Vector));
+        outline->ft_outline.tags = (char *) realloc(outline->ft_outline.tags, outline->points_alloc * sizeof(char));
      }
 }
 static Outline *
