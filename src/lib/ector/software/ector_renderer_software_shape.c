@@ -255,12 +255,17 @@ _line_value_set(Line *l, double x1, double y1, double x2, double y2)
    l->y2 = y2;
 }
 
+// approximate sqrt(x*x + y*y) using alpha max plus beta min algorithm.
+// With alpha = 1, beta = 3/8, giving results with a largest error less 
+// than 7% compared to the exact value.
 static double
 _line_length(Line *l)
 {
    double x = l->x2 - l->x1;
    double y = l->y2 - l->y1;
-   return sqrt( x*x + y*y);
+   x = x < 0 ? -x : x;
+   y = y < 0 ? -y : y;
+   return (x > y ? x + 0.375 * y : y + 0.375 * x);
 }
 
 static void
