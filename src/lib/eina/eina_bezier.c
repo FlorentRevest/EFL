@@ -19,13 +19,17 @@ _eina_bezier_1st_derivative(Eina_Bezier *bz, double t, double *px, double *py)
    *py = 3 * ( a * bz->y1 + b * bz->y2 + c * bz->y3 + d * bz->y4);
 }
 
-
+// approximate sqrt(x*x + y*y) using alpha max plus beta min algorithm.
+// With alpha = 1, beta = 3/8, giving results with a largest error less 
+// than 7% compared to the exact value.
 static
 double _line_length(double x1, double y1, double x2, double y2)
 {
    double x = x2 - x1;
    double y = y2 - y1;
-   return sqrt( x*x + y*y);
+   x = x < 0 ? -x : x;
+   y = y < 0 ? -y : y;
+   return (x > y ? x + 0.375 * y : y + 0.375 * x);
 }
 
 static void
