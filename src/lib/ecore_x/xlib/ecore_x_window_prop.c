@@ -16,6 +16,8 @@
   XChangeProperty(_ecore_x_disp, win, atom, XA_CARDINAL, 32, PropModeReplace, \
                   (unsigned char *)p_val, cnt)
 
+extern Eina_Bool _clipboard_incr_start;
+
 /*
  * Set CARD32 (array) property
  */
@@ -545,6 +547,25 @@ ecore_x_window_prop_property_get(Ecore_X_Window win,
    if (_ecore_xlib_sync) ecore_x_sync();
    if (ret != Success)
      return 0;
+   if (type_ret != type)
+     {
+        /* In case of INCR (ICCCM 2.7.2), we have to delete
+         * the property to request the owner to send the data
+         * chunks.
+         * Data is retrieved by the function _ecore_x_event_handle_property_notify.
+         * This part of code needs to be in this function, as
+         * this is the highest layer knowing of the type_ret,
+         * needed to identify the INCR request.
+         */
+        char *atom_name = ecore_x_atom_name_get(type_ret);
+        if (atom_name && !strcmp(atom_name, "INCR"))
+          {
+             _clipboard_incr_start = EINA_TRUE;
+             ecore_x_window_prop_property_del(win, property);
+             num_ret = 0; /* Forcing early exit */
+          }
+        free(atom_name);
+     }
    if ((!num_ret) || (size_ret <= 0))
      {
         XFree(prop_ret);
