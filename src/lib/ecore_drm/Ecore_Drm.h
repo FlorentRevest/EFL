@@ -29,6 +29,10 @@
 # include <Ecore.h>
 # include <Eeze.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef enum _Ecore_Drm_Evdev_Capabilities
 {
    EVDEV_KEYBOARD = (1 << 0),
@@ -747,5 +751,12 @@ EAPI void ecore_drm_device_pointer_xy_get(Ecore_Drm_Device *dev, int *x, int *y)
  * @since 1.14
  */
 EAPI const Eina_List *ecore_drm_devices_get(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#undef EAPI
+#define EAPI
 
 #endif
