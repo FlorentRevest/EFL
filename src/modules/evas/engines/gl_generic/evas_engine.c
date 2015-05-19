@@ -1433,7 +1433,7 @@ eng_gl_make_current(void *data, void *surface, void *context)
    // TODO: Add check for main thread before flush
 
    EVGLINIT(data, 0);
-   if ((sfc) && (ctx))
+   if (ctx)
      {
         Evas_Engine_GL_Context *gl_context;
 
