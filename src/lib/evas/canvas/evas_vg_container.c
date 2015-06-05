@@ -37,6 +37,8 @@ _efl_vg_container_eo_base_constructor(Eo *obj,
    nd->render_pre = _efl_vg_container_render_pre;
    nd->data = pd;
 
+   pd->names = eina_hash_stringshared_new(NULL);
+
    return obj;
 }
 
@@ -72,6 +74,24 @@ _efl_vg_container_efl_vg_base_bounds_get(Eo *obj EINA_UNUSED,
              eina_rectangle_union(r, &s);
           }
      }
+}
+
+static Efl_VG_Base *
+_efl_vg_container_child_get(Eo *obj EINA_UNUSED, Efl_VG_Container_Data *pd, const char *name)
+{
+   const char *tmp = eina_stringshare_add(name);
+   Efl_VG_Base *r;
+
+   r = eina_hash_find(pd->names, name);
+   eina_stringshare_del(tmp);
+
+   return r;
+}
+
+static Eina_Iterator *
+_efl_vg_container_children_get(Eo *obj EINA_UNUSED, Efl_VG_Container_Data *pd)
+{
+   return eina_list_iterator_new(pd->children);
 }
 
 EAPI Efl_VG*

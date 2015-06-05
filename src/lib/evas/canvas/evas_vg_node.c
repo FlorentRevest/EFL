@@ -270,6 +270,45 @@ _efl_vg_base_eo_base_destructor(Eo *obj, Efl_VG_Base_Data *pd)
 }
 
 static void
+_efl_vg_base_name_insert(Eo *obj, Efl_VG_Base_Data *pd, Efl_VG_Container_Data *cd)
+{
+   int hash;
+
+   hash = eina_hash_superfast(pd->name, eina_stringshare_strlen(pd->name));
+   if (eina_hash_find_by_hash(cd->names, pd->name, eina_stringshare_strlen(pd->name), hash))
+     {
+        eina_stringshare_del(pd->name);
+        pd->name = NULL;
+     }
+   else
+     {
+        eina_hash_direct_add_by_hash(cd->names, pd->name, eina_stringshare_strlen(pd->name), hash, obj);
+     }
+}
+
+static void
+_efl_vg_base_name_set(Eo *obj, Efl_VG_Base_Data *pd, const char *name)
+{
+   Efl_VG_Container_Data *cd = NULL;
+   Eo *parent = NULL;
+
+   if (_efl_vg_base_parent_checked_get(obj, &parent, &cd))
+     {
+        if (pd->name) eina_hash_del(cd->names, pd->name, obj);
+     }
+
+   eina_stringshare_replace(&pd->name, name);
+
+   if (cd) _efl_vg_base_name_insert(obj, pd, cd);
+}
+
+static const char *
+_efl_vg_base_name_get(Eo *obj EINA_UNUSED, Efl_VG_Base_Data *pd)
+{
+   return pd->name;
+}
+
+static void
 _efl_vg_base_eo_base_parent_set(Eo *obj,
                                 Efl_VG_Base_Data *pd EINA_UNUSED,
                                 Eo *parent)
@@ -298,11 +337,19 @@ _efl_vg_base_eo_base_parent_set(Eo *obj,
 
    // FIXME: this may become slow with to much object
    if (old_cd)
-     old_cd->children = eina_list_remove(old_cd->children, obj);
+     {
+        old_cd->children = eina_list_remove(old_cd->children, obj);
+
+        if (pd->name) eina_hash_del(old_cd->names, pd->name, obj);
+     }
 
    eo_do_super(obj, MY_CLASS, eo_parent_set(parent));
    if (cd)
-     cd->children = eina_list_append(cd->children, obj);
+     {
+        cd->children = eina_list_append(cd->children, obj);
+
+        _efl_vg_base_name_insert(obj, pd, cd);
+     }
 
    _efl_vg_base_changed(old_parent);
    _efl_vg_base_changed(obj);
