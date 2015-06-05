@@ -36,4 +36,13 @@ extern int _evg_log_dom_global;
 #endif /* ifdef CRI */
 #define CRI(...) EINA_LOG_DOM_CRIT(_evg_log_dom_global, __VA_ARGS__)
 
+static inline void
+_eo_ref_replace(Eo **dest, const Eo *src)
+{
+   Eo *tmp = *dest;
+
+   *dest = eo_ref(src);
+   eo_unref(tmp);
+}
+
 #endif
