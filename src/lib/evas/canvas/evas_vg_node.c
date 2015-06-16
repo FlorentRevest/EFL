@@ -583,6 +583,35 @@ _efl_vg_base_efl_gfx_stack_above_get(Eo *obj, Efl_VG_Base_Data *pd EINA_UNUSED)
    return above;
 }
 
+static Eina_Bool
+_efl_vg_base_interpolate(Eo *obj,
+                         Efl_VG_Base_Data *pd, const Efl_VG_Base *from, const Efl_VG_Base *to,
+                         double pos_map)
+{
+   Efl_VG_Base_Data *fromd, *tod;
+   double from_map;
+
+   fromd = eo_data_scope_get(from, EFL_VG_BASE_CLASS);
+   tod = eo_data_scope_get(to, EFL_VG_BASE_CLASS);
+   from_map = 1.0 - pos_map;
+
+   // FIXME: interpolate matrix with quaternion and matrix4 conversion
+
+   pd->x = fromd->x * from_map + tod->x * pos_map;
+   pd->y = fromd->y * from_map + tod->y * pos_map;
+
+   pd->r = fromd->r * from_map + tod->r * pos_map;
+   pd->g = fromd->g * from_map + tod->g * pos_map;
+   pd->b = fromd->b * from_map + tod->b * pos_map;
+   pd->a = fromd->a * from_map + tod->a * pos_map;
+
+   pd->visibility = pos_map >= 0.5 ? tod->visibility : fromd->visibility;
+
+   _efl_vg_base_changed(obj);
+
+   return EINA_TRUE;
+}
+
 EAPI Eina_Bool
 evas_vg_node_visible_get(Eo *obj)
 {

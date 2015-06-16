@@ -341,6 +341,19 @@ _efl_vg_shape_eo_base_destructor(Eo *obj, Efl_VG_Shape_Data *pd EINA_UNUSED)
    eo_do_super(obj, MY_CLASS, eo_destructor());
 }
 
+static Eina_Bool
+_efl_vg_shape_efl_vg_base_interpolate(Eo *obj,
+                                      Efl_VG_Shape_Data *pd EINA_UNUSED,
+                                      const Efl_VG_Base *from, const Efl_VG_Base *to,
+                                      double pos_map)
+{
+   Eina_Bool r;
+
+   eo_do_super(obj, MY_CLASS, r = efl_vg_interpolate(from, to, pos_map));
+
+   return r && evas_vg_shape_shape_interpolate(obj, from, to, pos_map);
+}
+
 EAPI double
 evas_vg_shape_stroke_scale_get(Eo *obj)
 {

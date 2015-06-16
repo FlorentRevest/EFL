@@ -94,6 +94,39 @@ _efl_vg_container_children_get(Eo *obj EINA_UNUSED, Efl_VG_Container_Data *pd)
    return eina_list_iterator_new(pd->children);
 }
 
+static Eina_Bool
+_efl_vg_container_efl_vg_base_interpolate(Eo *obj,
+                                          Efl_VG_Container_Data *pd,
+                                          const Efl_VG_Base *from, const Efl_VG_Base *to,
+                                          double pos_map)
+{
+   Eina_Iterator *it;
+   Eina_Hash_Tuple *tuple;
+   Eina_Bool r;
+
+   eo_do_super(obj, EFL_VG_CONTAINER_CLASS, r = efl_vg_interpolate(from, to, pos_map));
+
+   if (!r) return EINA_FALSE;
+
+   it = eina_hash_iterator_key_new(pd->names);
+   EINA_ITERATOR_FOREACH(it, tuple)
+     {
+        Eo *fromc, *toc;
+        Eo *cc = tuple->data;
+
+        eo_do(from, fromc = efl_vg_container_child_get(tuple->key));
+        eo_do(to, toc = efl_vg_container_child_get(tuple->key));
+
+        if (!toc || !fromc) continue ;
+        if (eo_class_get(toc) != eo_class_get(fromc)) continue ;
+
+        eo_do(cc, efl_vg_interpolate(fromc, toc, pos_map));
+     }
+   eina_iterator_free(it);
+
+   return EINA_TRUE;
+}
+
 EAPI Efl_VG*
 evas_vg_container_add(Efl_VG *parent)
 {
