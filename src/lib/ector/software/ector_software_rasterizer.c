@@ -114,14 +114,12 @@ SW_FT_Span *_intersect_spans_rect(const Eina_Rectangle *clip, const SW_FT_Span *
              out->coverage = spans->coverage;
              ++out;
           }
-
         ++spans;
         --available;
-    }
+     }
 
-    *out_spans = out;
-
-    return spans;
+   *out_spans = out;
+   return spans;
 }
 
 static inline int
@@ -129,75 +127,85 @@ _div_255(int x) { return (x + (x>>8) + 0x80) >> 8; }
 
 static const
 SW_FT_Span *_intersect_spans_region(const Shape_Rle_Data *clip, int *currentClip,
-                                       const SW_FT_Span *spans, const SW_FT_Span *end,
-                                       SW_FT_Span **out_spans, int available)
+                                    const SW_FT_Span *spans, const SW_FT_Span *end,
+                                    SW_FT_Span **out_spans, int available)
 {
-    SW_FT_Span *out = *out_spans;
+   SW_FT_Span *out = *out_spans;
 
-    const SW_FT_Span *clipSpans = clip->spans + *currentClip;
-    const SW_FT_Span *clipEnd = clip->spans + clip->size;
+   const SW_FT_Span *clipSpans = clip->spans + *currentClip;
+   const SW_FT_Span *clipEnd = clip->spans + clip->size;
 
-    while (available && spans < end ) {
-        if (clipSpans >= clipEnd) {
-            spans = end;
-            break;
-        }
-        if (clipSpans->y > spans->y) {
-            ++spans;
-            continue;
-        }
-        if (spans->y != clipSpans->y) {
-            ++clipSpans;
-            continue;
-        }
+   while (available && spans < end )
+     {
+        if (clipSpans >= clipEnd)
+          {
+             spans = end;
+             break;
+          }
+        if (clipSpans->y > spans->y)
+          {
+             ++spans;
+             continue;
+          }
+        if (spans->y != clipSpans->y)
+          {
+             ++clipSpans;
+             continue;
+          }
         //assert(spans->y == clipSpans->y);
-
         int sx1 = spans->x;
         int sx2 = sx1 + spans->len;
         int cx1 = clipSpans->x;
         int cx2 = cx1 + clipSpans->len;
 
-        if (cx1 < sx1 && cx2 < sx1) {
-            ++clipSpans;
-            continue;
-        } else if (sx1 < cx1 && sx2 < cx1) {
-            ++spans;
-            continue;
-        }
+        if (cx1 < sx1 && cx2 < sx1)
+          {
+             ++clipSpans;
+             continue;
+          }
+        else if (sx1 < cx1 && sx2 < cx1)
+          {
+             ++spans;
+             continue;
+          }
         int x = MAX(sx1, cx1);
         int len = MIN(sx2, cx2) - x;
-        if (len) {
-            out->x = MAX(sx1, cx1);
-            out->len = MIN(sx2, cx2) - out->x;
-            out->y = spans->y;
-            out->coverage = _div_255(spans->coverage * clipSpans->coverage);
-            ++out;
-            --available;
-        }
-        if (sx2 < cx2) {
-            ++spans;
-        } else {
-            ++clipSpans;
-        }
-    }
+        if (len)
+          {
+             out->x = MAX(sx1, cx1);
+             out->len = MIN(sx2, cx2) - out->x;
+             out->y = spans->y;
+             out->coverage = _div_255(spans->coverage * clipSpans->coverage);
+             ++out;
+             --available;
+          }
+        if (sx2 < cx2)
+          {
+             ++spans;
+          }
+        else
+          {
+             ++clipSpans;
+          }
+     }
 
-    *out_spans = out;
-    *currentClip = clipSpans - clip->spans;
-    return spans;
+   *out_spans = out;
+   *currentClip = clipSpans - clip->spans;
+   return spans;
 }
 
 static void
 _span_fill_clipRect(int span_count, const SW_FT_Span *spans, void *user_data)
 {
-    const int NSPANS = 256;
-    int clip_count, i;
-    SW_FT_Span cspans[NSPANS];
-    Span_Data *fill_data = (Span_Data *) user_data;
-    Clip_Data clip = fill_data->clip;
+   const int NSPANS = 256;
+   int clip_count, i;
+   SW_FT_Span cspans[NSPANS];
+   Span_Data *fill_data = (Span_Data *) user_data;
+   Clip_Data clip = fill_data->clip;
 
-    clip_count = eina_array_count(clip.clips);
-    for (i = 0; i < clip_count ; i ++)
-      {
+   clip_count = eina_array_count(clip.clips);
+   for (i = 0; i < clip_count; i++)
+     {
         Eina_Rectangle *rect = (Eina_Rectangle *)eina_array_data_get(clip.clips, i);
         Eina_Rectangle tmpRect;
 
@@ -211,32 +219,31 @@ _span_fill_clipRect(int span_count, const SW_FT_Span *spans, void *user_data)
         while (spans < end)
           {
              SW_FT_Span *clipped = cspans;
-             spans = _intersect_spans_rect(&tmpRect,spans, end, &clipped, NSPANS);
+             spans = _intersect_spans_rect(&tmpRect, spans, end, &clipped, NSPANS);
              if (clipped - cspans)
                fill_data->unclipped_blend(clipped - cspans, cspans, fill_data);
           }
-      }
+     }
 }
 
 static void
 _span_fill_clipPath(int span_count, const SW_FT_Span *spans, void *user_data)
 {
-    const int NSPANS = 256;
-    int current_clip = 0;
-    SW_FT_Span cspans[NSPANS];
-    Span_Data *fill_data = (Span_Data *) user_data;
-    Clip_Data clip = fill_data->clip;
+   const int NSPANS = 256;
+   int current_clip = 0;
+   SW_FT_Span cspans[NSPANS];
+   Span_Data *fill_data = (Span_Data *) user_data;
+   Clip_Data clip = fill_data->clip;
 
-    //TODO take clip path offset into account.
-    
-    const SW_FT_Span *end = spans + span_count;
-    while (spans < end)
-      {
-         SW_FT_Span *clipped = cspans;
-         spans = _intersect_spans_region(clip.path, &current_clip, spans, end, &clipped, NSPANS);
-         if (clipped - cspans)
-           fill_data->unclipped_blend(clipped - cspans, cspans, fill_data);
-      }
+   //TODO take clip path offset into account.
+   const SW_FT_Span *end = spans + span_count;
+   while (spans < end)
+     {
+        SW_FT_Span *clipped = cspans;
+        spans = _intersect_spans_region(clip.path, &current_clip, spans, end, &clipped, NSPANS);
+        if (clipped - cspans)
+          fill_data->unclipped_blend(clipped - cspans, cspans, fill_data);
+     }
 }
 
 static void
@@ -244,19 +251,19 @@ _adjust_span_fill_methods(Span_Data *spdata)
 {
    switch(spdata->type)
      {
-      case None:
-         spdata->unclipped_blend = 0;
-         break;
-      case Solid:
-         spdata->unclipped_blend = &_blend_color_argb;
-         break;
-      case LinearGradient:
-      case RadialGradient:
-         spdata->unclipped_blend = &_blend_gradient;
-         break;
-      case Image:
-         spdata->unclipped_blend = 0;//&_blend_image;
-         break;
+        case None:
+          spdata->unclipped_blend = 0;
+          break;
+        case Solid:
+          spdata->unclipped_blend = &_blend_color_argb;
+          break;
+        case LinearGradient:
+        case RadialGradient:
+          spdata->unclipped_blend = &_blend_gradient;
+          break;
+        case Image:
+          spdata->unclipped_blend = 0;//&_blend_image;
+          break;
      }
 
    // setup clipping
@@ -277,8 +284,6 @@ _adjust_span_fill_methods(Span_Data *spdata)
         spdata->blend = &_span_fill_clipPath;
      }
 }
-
-
 
 void ector_software_rasterizer_init(Software_Rasterizer *rasterizer)
 {
@@ -305,7 +310,6 @@ void ector_software_rasterizer_done(Software_Rasterizer *rasterizer)
    free(rasterizer->mem_pool);
 }
 
-
 void ector_software_rasterizer_stroke_set(Software_Rasterizer *rasterizer, double width,
                                           Efl_Gfx_Cap cap_style, Efl_Gfx_Join join_style)
 {
@@ -314,28 +318,28 @@ void ector_software_rasterizer_stroke_set(Software_Rasterizer *rasterizer, doubl
 
    switch (cap_style)
      {
-      case EFL_GFX_CAP_SQUARE:
-         cap = SW_FT_STROKER_LINECAP_SQUARE;
-         break;
-      case EFL_GFX_CAP_ROUND:
-         cap = SW_FT_STROKER_LINECAP_ROUND;
-         break;
-      default:
-         cap = SW_FT_STROKER_LINECAP_BUTT;
-         break;
+        case EFL_GFX_CAP_SQUARE:
+          cap = SW_FT_STROKER_LINECAP_SQUARE;
+          break;
+        case EFL_GFX_CAP_ROUND:
+          cap = SW_FT_STROKER_LINECAP_ROUND;
+          break;
+        default:
+          cap = SW_FT_STROKER_LINECAP_BUTT;
+          break;
      }
 
    switch (join_style)
      {
-      case EFL_GFX_JOIN_BEVEL:
-         join = SW_FT_STROKER_LINEJOIN_BEVEL;
-         break;
-      case EFL_GFX_JOIN_ROUND:
-         join = SW_FT_STROKER_LINEJOIN_ROUND;
-         break;
-      default:
-         join = SW_FT_STROKER_LINEJOIN_MITER;
-         break;
+        case EFL_GFX_JOIN_BEVEL:
+          join = SW_FT_STROKER_LINEJOIN_BEVEL;
+          break;
+        case EFL_GFX_JOIN_ROUND:
+          join = SW_FT_STROKER_LINEJOIN_ROUND;
+          break;
+        default:
+          join = SW_FT_STROKER_LINEJOIN_MITER;
+          break;
      }
 
    int stroke_width = (int)(width * 64);
@@ -351,7 +355,7 @@ _rle_generation_cb( int count, const SW_FT_Span*  spans,void *user)
    // allocate enough memory for new spans
    // alloc is required to prevent free and reallocation
    // when the rle needs to be regenerated because of attribute change.
-   if(rle->alloc < newsize)
+   if (rle->alloc < newsize)
      {
         rle->spans = (SW_FT_Span *) realloc(rle->spans, newsize * sizeof(SW_FT_Span));
         rle->alloc = newsize;
@@ -387,7 +391,7 @@ ector_software_rasterizer_generate_rle_data(Software_Rasterizer *rasterizer, SW_
      {
         t = span[0].y;
         b = span[rle_size-1].y;
-        for(i = 0; i < rle_size; i++)
+        for (i = 0; i < rle_size; i++)
           {
              if (span[i].x < l) l = span[i].x;
              if (span[i].x + span[i].len > r) r = span[i].x + span[i].len;
@@ -482,17 +486,18 @@ void ector_software_rasterizer_color_set(Software_Rasterizer *rasterizer, int r,
    rasterizer->fill_data.color = ECTOR_ARGB_JOIN(a, r, g, b);
    rasterizer->fill_data.type = Solid;
 }
+
 void ector_software_rasterizer_linear_gradient_set(Software_Rasterizer *rasterizer, Ector_Renderer_Software_Gradient_Data *linear)
 {
    rasterizer->fill_data.gradient = linear;
    rasterizer->fill_data.type = LinearGradient;
 }
+
 void ector_software_rasterizer_radial_gradient_set(Software_Rasterizer *rasterizer, Ector_Renderer_Software_Gradient_Data *radial)
 {
    rasterizer->fill_data.gradient = radial;
    rasterizer->fill_data.type = RadialGradient;
 }
-
 
 void ector_software_rasterizer_draw_rle_data(Software_Rasterizer *rasterizer,
                                              int x, int y, uint mul_col, Ector_Rop op, Shape_Rle_Data* rle)
@@ -508,6 +513,6 @@ void ector_software_rasterizer_draw_rle_data(Software_Rasterizer *rasterizer,
    _setup_span_fill_matrix(rasterizer);
    _adjust_span_fill_methods(&rasterizer->fill_data);
 
-   if(rasterizer->fill_data.blend)
+   if (rasterizer->fill_data.blend)
      rasterizer->fill_data.blend(rle->size, rle->spans, &rasterizer->fill_data);
 }
