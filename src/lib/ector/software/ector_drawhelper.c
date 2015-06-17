@@ -35,27 +35,18 @@ comp_func_solid_source_over(uint *dest, int length, uint color, uint const_alpha
 static void
 comp_func_source_over(uint *dest, const uint *src, int length, uint color, uint const_alpha)
 {
+   if (const_alpha != 255)
+     color = BYTE_MUL(color, const_alpha);
+
    if (color == 0xffffffff) // No color multiplier
      {
-        if (const_alpha == 255)
+        for (int i = 0; i < length; ++i)
           {
-             for (int i = 0; i < length; ++i)
+             uint s = src[i];
+             if (s >= 0xff000000)
+               dest[i] = s;
+             else if (s != 0)
                {
-                  uint s = src[i];
-                  if (s >= 0xff000000)
-                    dest[i] = s;
-                  else if (s != 0)
-                    {
-                       uint sia = Alpha(~s);
-                       dest[i] = s + BYTE_MUL(dest[i], sia);
-                    }
-              }
-          }
-        else
-          {
-             for (int i = 0; i < length; ++i)
-               {
-                  uint s = BYTE_MUL(src[i], const_alpha);
                   uint sia = Alpha(~s);
                   dest[i] = s + BYTE_MUL(dest[i], sia);
                }
@@ -63,26 +54,12 @@ comp_func_source_over(uint *dest, const uint *src, int length, uint color, uint 
      }
    else
      {
-        if (const_alpha == 255)
+        for (int i = 0; i < length; ++i)
           {
-             for (int i = 0; i < length; ++i)
-               {
-                  uint s = src[i];
-                  uint sc = ECTOR_MUL4_SYM(color, s);
-                  uint sia = Alpha(~sc);
-                  dest[i] = sc + BYTE_MUL(dest[i], sia);
-               }
-          }
-        else
-          {
-             for (int i = 0; i < length; ++i)
-               {
-                  uint s = src[i];
-                  uint sc = ECTOR_MUL4_SYM(color, s);
-                  sc = BYTE_MUL(sc, const_alpha);
-                  uint sia = Alpha(~sc);
-                  dest[i] = sc + BYTE_MUL(dest[i], sia);
-               }
+             uint s = src[i];
+             uint sc = ECTOR_MUL4_SYM(color, s);
+             uint sia = Alpha(~sc);
+             dest[i] = sc + BYTE_MUL(dest[i], sia);
           }
      }
 }

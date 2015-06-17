@@ -261,83 +261,42 @@ comp_func_source_sse2(uint *dest, const uint *src, int length, uint color, uint 
 static void
 comp_func_source_over_sse2(uint *dest, const uint *src, int length, uint color, uint const_alpha)
 {
+   if (const_alpha != 255)
+     color = BYTE_MUL(color, const_alpha);
+
    if (color == 0xffffffff) // No color multiplier
      {
-        if (const_alpha == 255)
-          {
-             LOOP_ALIGNED_U1_A4(dest, length,
-               { /* UOP */
-                  uint s = *src;
-                  uint sia = Alpha(~s);
-                  *dest = s + BYTE_MUL(*dest, sia);
-                  dest++; src++; length--;
-               },
-               { /* A4OP */
-                  V4_FETCH_SRC_DEST
-                  V4_COMP_OP_SRC_OVER
-                  V4_STORE_DEST
-                  V4_SRC_DEST_LEN_INC
-               })
-          }
-        else
-          {
-             __m128i v_alpha = _mm_set1_epi16(const_alpha);
-             LOOP_ALIGNED_U1_A4(dest, length,
-               { /* UOP */
-                  uint s = BYTE_MUL(*src, const_alpha);
-                  uint sia = Alpha(~s);
-                  *dest = s + BYTE_MUL(*dest, sia);
-                  dest++; src++; length--;
-               },
-               { /* A4OP */
-                  V4_FETCH_SRC_DEST
-                  V4_ALPHA_MULTIPLY
-                  V4_COMP_OP_SRC_OVER
-                  V4_STORE_DEST
-                  V4_SRC_DEST_LEN_INC
-               })
-          }
+        LOOP_ALIGNED_U1_A4(dest, length,
+         { /* UOP */
+            uint s = *src;
+            uint sia = Alpha(~s);
+            *dest = s + BYTE_MUL(*dest, sia);
+            dest++; src++; length--;
+         },
+         { /* A4OP */
+            V4_FETCH_SRC_DEST
+            V4_COMP_OP_SRC_OVER
+            V4_STORE_DEST
+            V4_SRC_DEST_LEN_INC
+         })
      }
    else
      {
         __m128i v_color = _mm_set1_epi32(color);
-        if (const_alpha == 255)
-          {
-             LOOP_ALIGNED_U1_A4(dest, length,
-               { /* UOP */
-                  uint s = ECTOR_MUL4_SYM(*src, color);
-                  uint sia = Alpha(~s);
-                  *dest = s + BYTE_MUL(*dest, sia);
-                  dest++; src++; length--;
-               },
-               { /* A4OP */
-                  V4_FETCH_SRC_DEST
-                  V4_COLOR_MULTIPLY
-                  V4_COMP_OP_SRC_OVER
-                  V4_STORE_DEST
-                  V4_SRC_DEST_LEN_INC
-               })
-          }
-        else
-          {
-             __m128i v_alpha = _mm_set1_epi16(const_alpha);
-             LOOP_ALIGNED_U1_A4(dest, length,
-               { /* UOP */
-                  uint s = ECTOR_MUL4_SYM(*src, color);
-                  s = BYTE_MUL(s, const_alpha);
-                  uint sia = Alpha(~s);
-                  *dest = s + BYTE_MUL(*dest, sia);
-                  dest++; src++; length--;
-               },
-               { /* A4OP */
-                  V4_FETCH_SRC_DEST
-                  V4_COLOR_MULTIPLY
-                  V4_ALPHA_MULTIPLY
-                  V4_COMP_OP_SRC_OVER
-                  V4_STORE_DEST
-                  V4_SRC_DEST_LEN_INC
-               })
-          }
+        LOOP_ALIGNED_U1_A4(dest, length,
+         { /* UOP */
+            uint s = ECTOR_MUL4_SYM(*src, color);
+            uint sia = Alpha(~s);
+            *dest = s + BYTE_MUL(*dest, sia);
+            dest++; src++; length--;
+         },
+         { /* A4OP */
+            V4_FETCH_SRC_DEST
+            V4_COLOR_MULTIPLY
+            V4_COMP_OP_SRC_OVER
+            V4_STORE_DEST
+            V4_SRC_DEST_LEN_INC
+         })
      }
 }
 
