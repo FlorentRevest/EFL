@@ -368,6 +368,8 @@ _rle_generation_cb( int count, const SW_FT_Span*  spans,void *user)
 Shape_Rle_Data *
 ector_software_rasterizer_generate_rle_data(Software_Rasterizer *rasterizer, SW_FT_Outline *outline)
 {
+   int i, rle_size;
+   int l = 0, t = 0, r = 0, b = 0;
    Shape_Rle_Data *rle_data = (Shape_Rle_Data *) calloc(1, sizeof(Shape_Rle_Data));
    SW_FT_Raster_Params params;
 
@@ -378,6 +380,23 @@ ector_software_rasterizer_generate_rle_data(Software_Rasterizer *rasterizer, SW_
 
    sw_ft_grays_raster.raster_render(rasterizer->raster, &params);
 
+   // update RLE bounding box.
+   SW_FT_Span* span = rle_data->spans;
+   rle_size = rle_data->size;
+   if (rle_size)
+     {
+        t = span[0].y;
+        b = span[rle_size-1].y;
+        for(i = 0; i < rle_size; i++)
+          {
+             if (span[i].x < l) l = span[i].x;
+             if (span[i].x + span[i].len > r) r = span[i].x + span[i].len;
+          }
+        rle_data->bbox.x = l;
+        rle_data->bbox.y = t;
+        rle_data->bbox.w = r - l;
+        rle_data->bbox.h = b - t + 1;
+     }
    return rle_data;
 }
 
