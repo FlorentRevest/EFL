@@ -148,9 +148,11 @@ RGBA_Comp_Func ector_comp_func_span_get(Ector_Rop op, uint color, Eina_Bool src_
 
 extern void init_drawhelper_gradient();
 extern void init_draw_helper_sse2();
+extern void init_draw_helper_neon();
 
 void init_draw_helper()
 {
    init_drawhelper_gradient();
    init_draw_helper_sse2();
+   init_draw_helper_neon();
 }
