@@ -297,6 +297,36 @@ class Evas.Textblock (Evas.Object)
             @in ts: Evas.Textblock.Style *; /*@ the style to set. */
          }
       }
+      extension_append {
+         /*@
+         Appends an extension to this Textblock Evas Object.
+         An extension is a lighter form of Textblock,
+         to which this Textblock will flow when constraints exist e.g.
+         geometric constraints, when there is no room left for more
+         text in the current size of the object.
+         By providing a @ref Evas_Object of type Evas_Object_Textblock_Extension
+         object, the layout will naturally continue to it, as they were a
+         single object.
+         @return Returns true if succeeds, false if fail.
+         @since 1.15
+         */
+         params {
+            @in ext_eo: Evas_Object *;
+         }
+         return: Eina_Bool;
+      }
+      extension_remove {
+         /*@
+         Removes an extension from this Textblock Evas Object.
+         @see evas_object_textblock_extension_append
+         @return Returns true if succeeds, false if fail.
+         @since 1.15
+         */
+         params {
+            @in ext_eo: Evas_Object *;
+         }
+         return: Eina_Bool;
+      }
    }
    implements {
       Eo.Base.constructor;
