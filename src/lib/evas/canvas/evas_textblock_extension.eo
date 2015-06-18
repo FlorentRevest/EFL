@@ -1,0 +1,10 @@
+class Evas.Textblock_Extension (Evas.Object)
+{
+   legacy_prefix: evas_object_textblock_extension;
+   eo_prefix: evas_obj_textblock_extension;
+   implements {
+      Eo.Base.constructor;
+      Eo.Base.destructor;
+      Eo.Base.dbg_info_get;
+   }
+}
