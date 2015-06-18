@@ -1426,7 +1426,8 @@ struct _Evas_Func
    Ector_Surface *(*ector_get)           (void *data);
    void  (*ector_begin)                  (void *data, void *context, void *surface, int x, int y, Eina_Bool do_async);
    void  (*ector_renderer_draw)          (void *data, void *context, void *surface, Ector_Renderer *r, Eina_Array *clips, Eina_Bool do_async);
-   void  (*ector_end)                    (void *data, void *context, void *surface, Eina_Bool do_async);
+   void  *(*ector_end)                   (void *data, void *context, void *surface, Eina_Bool do_async);
+   void *(*ector_surface_create)         (void *data, void *surface, int w, int h);
 };
 
 struct _Evas_Image_Save_Func

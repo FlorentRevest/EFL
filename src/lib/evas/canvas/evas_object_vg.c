@@ -22,6 +22,8 @@ struct _Evas_VG_Data
    Eina_Rectangle fill;
 
    unsigned int width, height;
+
+   void *backing_store;
 };
 
 static void evas_object_vg_render(Evas_Object *eo_obj,
@@ -94,8 +96,12 @@ _evas_vg_root_node_get(Eo *obj EINA_UNUSED, Evas_VG_Data *pd)
 void
 _evas_vg_eo_base_destructor(Eo *eo_obj, Evas_VG_Data *pd)
 {
+   if (pd->backing_store) {
+      Evas_Object_Protected_Data *obj = eo_data_scope_get(eo_obj, EVAS_OBJECT_CLASS);
+      obj->layer->evas->engine.func->image_free(obj->layer->evas->engine.data.output,
+                                                  pd->backing_store);
+   }
    eo_unref(pd->root);
-   pd->root = NULL;
    eo_do_super(eo_obj, MY_CLASS, eo_destructor());
 }
 
@@ -154,6 +160,10 @@ evas_object_vg_render(Evas_Object *eo_obj EINA_UNUSED,
 {
    Evas_VG_Data *vd = type_private_data;
 
+   vd->backing_store = obj->layer->evas->engine.func->ector_surface_create(output,
+                                                                           vd->backing_store,
+                                                                           obj->cur->geometry.w,
+                                                                           obj->cur->geometry.h);
    // FIXME: Set context (that should affect Ector_Surface) and
    // then call Ector_Renderer render from bottom to top. Get the
    // Ector_Surface that match the output from Evas engine API.
@@ -178,11 +188,25 @@ evas_object_vg_render(Evas_Object *eo_obj EINA_UNUSED,
                                                          obj->cur->anti_alias);
    obj->layer->evas->engine.func->context_render_op_set(output, context,
                                                         obj->cur->render_op);
-   obj->layer->evas->engine.func->ector_begin(output, context, surface,
-                                              obj->cur->geometry.x + x, obj->cur->geometry.y + y,
-                                              do_async);
-   _evas_vg_render(obj, output, context, surface, vd->root, NULL,
-                   do_async);
+   if (!vd->backing_store)
+     {
+        obj->layer->evas->engine.func->ector_begin(output, context, surface,
+                                                   obj->cur->geometry.x + x, obj->cur->geometry.y + y,
+                                                   do_async);
+        _evas_vg_render(obj, output, context, surface, vd->root, NULL, do_async);
+     }
+   else
+     {
+        obj->layer->evas->engine.func->ector_begin(output, context, vd->backing_store, 0, 0, do_async);
+        _evas_vg_render(obj, output, context, vd->backing_store, vd->root, NULL,do_async);
+        obj->layer->evas->engine.func->image_dirty_region(obj->layer->evas->engine.data.output, vd->backing_store,
+                                                          0, 0, 0, 0);
+        obj->layer->evas->engine.func->image_draw(output, context, surface,
+                                             vd->backing_store, 0, 0,
+                                             obj->cur->geometry.w, obj->cur->geometry.h, obj->cur->geometry.x + x,
+                                             obj->cur->geometry.y + y, obj->cur->geometry.w, obj->cur->geometry.h,
+                                             EINA_TRUE, do_async);
+     }
    obj->layer->evas->engine.func->ector_end(output, context, surface, do_async);
 }
 
