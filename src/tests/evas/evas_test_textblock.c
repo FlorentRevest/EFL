@@ -35,6 +35,7 @@ static const char *style_buf =
    Evas_Object *tb; \
    Evas_Textblock_Style *st; \
    Evas_Textblock_Cursor *cur; \
+   printf("%s:%d, Staring Textblock Test\n", __FILE__, __LINE__); \
    evas = EVAS_TEST_INIT_EVAS(); \
    evas_font_hinting_set(evas, EVAS_FONT_HINTING_AUTO); \
    tb = evas_object_textblock_add(evas); \
@@ -3292,6 +3293,43 @@ START_TEST(evas_textblock_delete)
 }
 END_TEST;
 
+START_TEST(evas_textblock_extension)
+{
+   START_TB_TEST();
+   Evas_Coord fw, fh;
+   Evas_Coord w = 300, h = 300;
+   const char *buf = "This is a<br/> test.<ps/>Lets see if this works.<ps/>עוד פסקה.";
+   Evas_Object *ext = eo_add(EVAS_TEXTBLOCK_EXTENSION_CLASS, tb);
+
+   /* Test #1 */
+   printf("test #1\n");
+   eo_do(tb, evas_obj_textblock_extension_append(ext));
+   eo_do(tb, evas_obj_textblock_text_markup_set(buf));
+
+   eo_do(tb, efl_gfx_size_set(w, h));
+   eo_do(ext, efl_gfx_size_set(w, h));
+   eo_do(tb, evas_obj_textblock_size_formatted_get(&fw, &fh));
+   ck_assert(ext);
+
+   /* Test #2 */
+   printf("test #2\n");
+   buf = "<wrap=word>"
+         "This tests the text flow to a light-weight textblock-like object"
+         " (named: Textblock_Extension). The first textblock 'tb' will not have"
+         " enough space to contain this text, and the following is expected to"
+         " flow to the extension object 'ext'";
+   eo_do(tb, evas_obj_textblock_text_markup_set(buf));
+   eo_do(tb, efl_gfx_size_set(50, 50));
+   eo_do(ext, efl_gfx_size_set(w, h));
+   eo_do(tb, evas_obj_textblock_size_formatted_get(&fw, &fh));
+   // TODO: check formatted size values
+
+   printf("tests done\n");
+
+   END_TB_TEST();
+}
+END_TEST;
+
 void evas_test_textblock(TCase *tc)
 {
    tcase_add_test(tc, evas_textblock_simple);
@@ -3313,5 +3351,7 @@ void evas_test_textblock(TCase *tc)
    tcase_add_test(tc, evas_textblock_wrapping);
    tcase_add_test(tc, evas_textblock_items);
    tcase_add_test(tc, evas_textblock_delete);
+   /* textblock extension */
+   tcase_add_test(tc, evas_textblock_extension);
 }
 
