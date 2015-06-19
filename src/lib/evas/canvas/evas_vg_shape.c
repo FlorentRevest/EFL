@@ -354,6 +354,63 @@ _efl_vg_shape_efl_vg_base_interpolate(Eo *obj,
    return r && evas_vg_shape_shape_interpolate(obj, from, to, pos_map);
 }
 
+static void
+_efl_vg_shape_efl_vg_base_dup(Eo *obj, Efl_VG_Shape_Data *pd, const Efl_VG_Base *from)
+{
+   Efl_VG_Shape_Data *fromd;
+
+   eo_do_super(obj, MY_CLASS, efl_vg_dup(from));
+
+   fromd = eo_data_scope_get(obj, MY_CLASS);
+
+   // We may be an already initialized node, clean it first
+   _efl_vg_clean_object(&pd->fill);
+   if (fromd->fill)
+     {
+        pd->fill = eo_add(eo_class_get(fromd->fill),
+                          obj,
+                          efl_vg_dup(fromd->fill));
+     }
+
+   pd->stroke.dash = _efl_vg_realloc(pd->stroke.dash, sizeof (Efl_Gfx_Dash) * fromd->stroke.dash_count);
+   if (pd->stroke.dash)
+     {
+        pd->stroke.dash_count = fromd->stroke.dash_count;
+        memcpy(pd->stroke.dash, fromd->stroke.dash,
+               sizeof (Efl_Gfx_Dash) * pd->stroke.dash_count);
+     }
+   else
+     {
+        pd->stroke.dash_count = 0;
+     }
+
+   _efl_vg_clean_object(&pd->stroke.fill);
+   if (fromd->stroke.fill)
+     {
+        pd->stroke.fill = eo_add(eo_class_get(fromd->stroke.fill),
+                                 NULL,
+                                 efl_vg_dup(fromd->stroke.fill));
+     }
+
+   _efl_vg_clean_object(&fromd->stroke.marker);
+   if (fromd->stroke.marker)
+     {
+        pd->stroke.marker = eo_add(eo_class_get(fromd->stroke.marker),
+                                   NULL,
+                                   efl_vg_dup(fromd->stroke.marker));
+     }
+
+   pd->stroke.scale = fromd->stroke.scale;
+   pd->stroke.width = fromd->stroke.width;
+   pd->stroke.centered = fromd->stroke.centered;
+   pd->stroke.r = fromd->stroke.r;
+   pd->stroke.g = fromd->stroke.g;
+   pd->stroke.b = fromd->stroke.b;
+   pd->stroke.a = fromd->stroke.a;
+   pd->stroke.cap = fromd->stroke.cap;
+   pd->stroke.join = fromd->stroke.join;
+}
+
 EAPI double
 evas_vg_shape_stroke_scale_get(Eo *obj)
 {

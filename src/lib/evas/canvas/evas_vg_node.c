@@ -612,6 +612,44 @@ _efl_vg_base_interpolate(Eo *obj,
    return EINA_TRUE;
 }
 
+static void
+_efl_vg_base_dup(Eo *obj, Efl_VG_Base_Data *pd, const Efl_VG_Base *from)
+{
+   Efl_VG_Base_Data *fromd;
+
+   fromd = eo_data_scope_get(from, EFL_VG_BASE_CLASS);
+   pd->name = eina_stringshare_ref(fromd->name);
+
+   if (fromd->m)
+     {
+        pd->m = pd->m ? pd->m : malloc(sizeof (Eina_Matrix3)) ;
+        if (pd->m) memcpy(pd->m, fromd->m, sizeof (Eina_Matrix3));
+     }
+   else
+     {
+        free(pd->m);
+     }
+
+   // We may come from an already duped/initialized node, clean it first
+   _efl_vg_clean_object(&pd->mask);
+   if (fromd->mask)
+     {
+        pd->mask = eo_add(eo_class_get(fromd->mask),
+                          obj,
+                          efl_vg_dup(pd->mask));
+     }
+
+   pd->x = fromd->x;
+   pd->y = fromd->y;
+   pd->r = fromd->r;
+   pd->g = fromd->g;
+   pd->b = fromd->b;
+   pd->a = fromd->a;
+   pd->visibility = fromd->visibility;
+
+   _efl_vg_base_changed(obj);
+}
+
 EAPI Eina_Bool
 evas_vg_node_visible_get(Eo *obj)
 {

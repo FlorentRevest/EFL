@@ -170,6 +170,24 @@ _efl_vg_gradient_radial_efl_vg_base_interpolate(Eo *obj,
    return EINA_TRUE;
 }
 
+static void
+_efl_vg_gradient_radial_efl_vg_base_dup(Eo *obj,
+                                        Efl_VG_Gradient_Radial_Data *pd,
+                                        const Efl_VG_Base *from)
+{
+   Efl_VG_Gradient_Radial_Data *fromd;
+
+   eo_do_super(obj, EFL_VG_GRADIENT_RADIAL_CLASS, efl_vg_dup(from));
+
+   fromd = eo_data_scope_get(from, EFL_VG_GRADIENT_RADIAL_CLASS);
+
+   pd->focal.x = fromd->focal.x;
+   pd->focal.y = fromd->focal.y;
+   pd->center.x = fromd->center.x;
+   pd->center.y = fromd->center.y;
+   pd->radius = fromd->radius;
+}
+
 EAPI void
 evas_vg_gradient_radial_center_set(Eo *obj, double x, double y)
 {
