@@ -25,6 +25,7 @@ _evas_vg_root_node_render_pre(Eo *obj EINA_UNUSED,
    Efl_VG_Container_Data *pd = data;
    Eina_List *l;
    Eo *child;
+   if (!nd->changed) return;
 
    EFL_VG_COMPUTE_MATRIX(current, parent, nd);
 
