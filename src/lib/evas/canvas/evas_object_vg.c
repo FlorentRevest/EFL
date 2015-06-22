@@ -18,7 +18,7 @@ struct _Evas_VG_Data
 {
    void   *engine_data;
    Efl_VG *root;
-
+   Eina_Bool content_changed;
    Eina_Rectangle fill;
 
    unsigned int width, height;
@@ -194,20 +194,24 @@ evas_object_vg_render(Evas_Object *eo_obj EINA_UNUSED,
                                                    obj->cur->geometry.x + x, obj->cur->geometry.y + y,
                                                    do_async);
         _evas_vg_render(obj, output, context, surface, vd->root, NULL, do_async);
+        obj->layer->evas->engine.func->ector_end(output, context, surface, do_async);
      }
    else
      {
-        obj->layer->evas->engine.func->ector_begin(output, context, vd->backing_store, 0, 0, do_async);
-        _evas_vg_render(obj, output, context, vd->backing_store, vd->root, NULL,do_async);
-        obj->layer->evas->engine.func->image_dirty_region(obj->layer->evas->engine.data.output, vd->backing_store,
-                                                          0, 0, 0, 0);
+        if (vd->content_changed)
+          {
+             obj->layer->evas->engine.func->ector_begin(output, context, vd->backing_store, 0, 0, do_async);
+             _evas_vg_render(obj, output, context, vd->backing_store, vd->root, NULL,do_async);
+             obj->layer->evas->engine.func->image_dirty_region(obj->layer->evas->engine.data.output, vd->backing_store,
+                                                               0, 0, 0, 0);
+             obj->layer->evas->engine.func->ector_end(output, context, surface, do_async);
+          }
         obj->layer->evas->engine.func->image_draw(output, context, surface,
-                                             vd->backing_store, 0, 0,
-                                             obj->cur->geometry.w, obj->cur->geometry.h, obj->cur->geometry.x + x,
-                                             obj->cur->geometry.y + y, obj->cur->geometry.w, obj->cur->geometry.h,
-                                             EINA_TRUE, do_async);
+                                                  vd->backing_store, 0, 0,
+                                                  obj->cur->geometry.w, obj->cur->geometry.h, obj->cur->geometry.x + x,
+                                                  obj->cur->geometry.y + y, obj->cur->geometry.w, obj->cur->geometry.h,
+                                                  EINA_TRUE, do_async);
      }
-   obj->layer->evas->engine.func->ector_end(output, context, surface, do_async);
 }
 
 static void
@@ -263,9 +267,19 @@ evas_object_vg_render_pre(Evas_Object *eo_obj,
      }
    else if (rnd->changed)
      {
+        vd->content_changed = EINA_TRUE;
         rnd->changed = EINA_FALSE;
         evas_object_render_pre_prev_cur_add(&obj->layer->evas->clip_changes, eo_obj, obj);
         goto done;
+     }
+   else
+     {
+        // if size got changed , force a redraw.
+        if ((obj->cur->geometry.w != obj->prev->geometry.w) ||
+            (obj->cur->geometry.h != obj->prev->geometry.h))
+          vd->content_changed = EINA_TRUE;
+        else
+          vd->content_changed = EINA_FALSE;
      }
 
    if (is_v != was_v)
