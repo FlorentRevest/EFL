@@ -3555,64 +3555,20 @@ _draw_thread_ector_draw(void *data)
 }
 
 static void
-eng_ector_renderer_draw(void *data EINA_UNUSED, void *context, void *surface, Ector_Renderer *renderer, Eina_Array *clips, Eina_Bool do_async)
+eng_ector_renderer_draw(void *data EINA_UNUSED, void *context, void *surface, Ector_Renderer *renderer, Eina_Array *clips EINA_UNUSED, Eina_Bool do_async)
 {
-   RGBA_Image *dst = surface;
+   RGBA_Image *img = surface;
    RGBA_Draw_Context *dc = context;
    Evas_Thread_Command_Ector ector;
    Eina_Array *c;
-   Eina_Rectangle *r;
-   Eina_Rectangle clip;
-   Eina_Array_Iterator it;
-   unsigned int i;
 
-   if (dc->clip.use)
-     {
-        clip.x = dc->clip.x;
-        clip.y = dc->clip.y;
-        clip.w = dc->clip.w;
-        clip.h = dc->clip.h;
-     }
-   else
-     {
-        clip.x = 0;
-        clip.y = 0;
-        clip.w = dst->cache_entry.w;
-        clip.h = dst->cache_entry.h;
-     }
-
-   c = eina_array_new(8);
-   if (clips)
-     {
-        EINA_ARRAY_ITER_NEXT(clips, i, r, it)
-          {
-             Eina_Rectangle *rc;
-
-             rc = eina_rectangle_new(r->x, r->y, r->w, r->h);
-             if (!rc) continue;
-
-             if (eina_rectangle_intersection(rc, &clip))
-               eina_array_push(c, rc);
-             else
-               eina_rectangle_free(rc);
-          }
-
-        if (eina_array_count(c) == 0 &&
-            eina_array_count(clips) > 0)
-          {
-             eina_array_free(c);
-             return;
-          }
-     }
-
-   if (eina_array_count(c) == 0)
-     eina_array_push(c, eina_rectangle_new(clip.x, clip.y, clip.w, clip.h));
+   c = eina_array_new(1);
+   eina_array_push(c, eina_rectangle_new(0, 0, img->cache_entry.w, img->cache_entry.h));
 
    ector.r = eo_ref(renderer);
    ector.clips = c;
    ector.render_op = _evas_render_op_to_ector_rop(dc->render_op);
-   ector.mul_col = ector_color_multiply(dc->mul.use ? dc->mul.col : 0xffffffff,
-                                        dc->col.col);;
+   ector.mul_col = 0xffffffff;
    ector.free_it = EINA_FALSE;
 
    if (do_async)
@@ -3677,9 +3633,31 @@ _draw_thread_ector_surface_set(void *data)
 }
 
 static void *
-eng_ector_surface_create(void *data EINA_UNUSED, void *surface EINA_UNUSED, int width EINA_UNUSED, int height EINA_UNUSED)
+eng_ector_surface_create(void *data EINA_UNUSED, void *surface, int width, int height)
 {
-   return NULL;
+   RGBA_Image *im;
+
+   if (!surface)
+     {
+        surface = eng_image_new_from_copied_data(data, width, height, NULL, EINA_TRUE, EVAS_COLORSPACE_ARGB8888);
+     }
+   else
+     {
+        int cur_w , cur_h;
+        im = surface;
+        cur_w = im->cache_entry.w;
+        cur_h = im->cache_entry.h;
+        if (width != cur_w || height != cur_h)
+          {
+             eng_image_free(data, surface);
+             surface =  eng_image_new_from_copied_data(data, width, height, NULL, EINA_TRUE, EVAS_COLORSPACE_ARGB8888);
+          }
+      }
+   // clear the buffer
+   im = surface;
+   void *pixels = evas_cache_image_pixels(&im->cache_entry);
+   memset(pixels, 0, width * height *4);
+   return surface;
 }
 
 static void

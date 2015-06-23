@@ -159,11 +159,11 @@ evas_object_vg_render(Evas_Object *eo_obj EINA_UNUSED,
                       int x, int y, Eina_Bool do_async)
 {
    Evas_VG_Data *vd = type_private_data;
-
-   vd->backing_store = obj->layer->evas->engine.func->ector_surface_create(output,
-                                                                           vd->backing_store,
-                                                                           obj->cur->geometry.w,
-                                                                           obj->cur->geometry.h);
+   if (vd->content_changed)
+     vd->backing_store = obj->layer->evas->engine.func->ector_surface_create(output,
+                                                                             vd->backing_store,
+                                                                             obj->cur->geometry.w,
+                                                                             obj->cur->geometry.h);
    // FIXME: Set context (that should affect Ector_Surface) and
    // then call Ector_Renderer render from bottom to top. Get the
    // Ector_Surface that match the output from Evas engine API.
