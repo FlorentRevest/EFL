@@ -17,8 +17,7 @@ _blend_color_argb(int count, const SW_FT_Span *spans, void *user_data)
    RGBA_Comp_Func_Solid comp_func;
    Span_Data *data = (Span_Data *)(user_data);
 
-   // multiply the color with mul_col if any
-   uint color = ECTOR_MUL4_SYM(data->color, data->mul_col);
+   uint color = data->color;
    comp_func = ector_comp_func_solid_span_get(data->op, color);
 
    // move to the offset location

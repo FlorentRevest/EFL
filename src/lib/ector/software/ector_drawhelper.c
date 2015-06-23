@@ -33,12 +33,9 @@ comp_func_solid_source_over(uint *dest, int length, uint color, uint const_alpha
 
 
 static void
-comp_func_source_over(uint *dest, const uint *src, int length, uint color, uint const_alpha)
+comp_func_source_over(uint *dest, const uint *src, int length, uint color EINA_UNUSED, uint const_alpha)
 {
-   if (const_alpha != 255)
-     color = BYTE_MUL(color, const_alpha);
-
-   if (color == 0xffffffff) // No color multiplier
+   if (const_alpha == 255)
      {
         for (int i = 0; i < length; ++i)
           {
@@ -57,7 +54,7 @@ comp_func_source_over(uint *dest, const uint *src, int length, uint color, uint 
         for (int i = 0; i < length; ++i)
           {
              uint s = src[i];
-             uint sc = ECTOR_MUL4_SYM(color, s);
+             uint sc = BYTE_MUL(s, const_alpha);
              uint sia = Alpha(~sc);
              dest[i] = sc + BYTE_MUL(dest[i], sia);
           }
@@ -83,37 +80,16 @@ comp_func_solid_source(uint *dest, int length, uint color, uint const_alpha)
 }
 
 static void
-comp_func_source(uint *dest, const uint *src, int length, uint color, uint const_alpha)
+comp_func_source(uint *dest, const uint *src, int length, uint color EINA_UNUSED, uint const_alpha)
 {
-   if (color == 0xffffffff) // No color multiplier
-     {
-        if (const_alpha == 255)
-          memcpy(dest, src, length * sizeof(uint));
-        else
-         {
-            int i, ialpha = 255 - const_alpha;
-            for (i = 0; i < length; ++i)
-              dest[i] = INTERPOLATE_PIXEL_256(src[i], const_alpha, dest[i], ialpha);
-         }
-     }
+   if (const_alpha == 255)
+     memcpy(dest, src, length * sizeof(uint));
    else
-     {
-        if (const_alpha == 255)
-          {
-             int i = 0;
-             for (; i < length; ++i)
-               dest[i] = ECTOR_MUL4_SYM(src[i], color);
-          }
-        else
-          {
-            int i, ialpha = 255 - const_alpha;
-            for (i = 0; i < length; ++i)
-              {
-                 uint src_color = ECTOR_MUL4_SYM(src[i], color);
-                 dest[i] = INTERPOLATE_PIXEL_256(src_color, const_alpha, dest[i], ialpha);
-            }
-          }
-     }
+    {
+       int i, ialpha = 255 - const_alpha;
+       for (i = 0; i < length; ++i)
+         dest[i] = INTERPOLATE_PIXEL_256(src[i], const_alpha, dest[i], ialpha);
+    }
 }
 
 RGBA_Comp_Func_Solid func_for_mode_solid[ECTOR_ROP_LAST] = {
