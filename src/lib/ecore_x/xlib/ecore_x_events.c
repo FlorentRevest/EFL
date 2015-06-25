@@ -23,10 +23,12 @@
 #endif /* ifndef CODESET */
 
 /* INCR mechanism variables */
+Ecore_Timer *_clipboard_incr_start = NULL;
 static unsigned long _clipboard_incr_data_length = 0; /* Current received data length */
 static char *_clipboard_incr_data = NULL; /* Current received data */
 static Ecore_X_Event_Selection_Notify *_clipboard_incr_event = NULL; /* Event to send once the data is ready */
-Eina_Bool _clipboard_incr_start = EINA_FALSE;
+static Ecore_Timer *_clipboard_incr_timeout = NULL;
+static Atom _clipboard_data_atom;
 
 typedef struct _Ecore_X_Mouse_Down_Info
 {
@@ -169,7 +171,7 @@ _ecore_x_event_free_selection_notify(void *data EINA_UNUSED,
 
    e = ev;
    sel = e->data;
-   if (sel->free)
+   if (sel && sel->free)
      sel->free(sel);
 
    free(e->target);
@@ -1344,6 +1346,19 @@ _ecore_x_event_handle_circulate_request(XEvent *xevent)
    ecore_event_add(ECORE_X_EVENT_WINDOW_STACK_REQUEST, e, NULL, NULL);
 }
 
+static Eina_Bool
+_incr_data_reset(void *data EINA_UNUSED)
+{
+   printf("Timeout: reset INCR\n");
+   _clipboard_incr_start = EINA_FALSE;
+   _clipboard_incr_data = NULL;
+   _clipboard_incr_data_length = 0;
+   _clipboard_incr_event = NULL;
+   ecore_timer_del(_clipboard_incr_timeout);
+   _clipboard_incr_timeout = NULL;
+   return EINA_TRUE;
+}
+
 void
 _ecore_x_event_handle_property_notify(XEvent *xevent)
 {
@@ -1356,6 +1371,7 @@ _ecore_x_event_handle_property_notify(XEvent *xevent)
     * of the sending and results in sending the event to the upper
     * layer with all the data.
     */
+   printf("%s/%d: In\n", __FUNCTION__, __LINE__);
    if (xevent->xproperty.state == PropertyNewValue && _clipboard_incr_start)
      {
         Atom type_ret = 0;
@@ -1366,36 +1382,42 @@ _ecore_x_event_handle_property_notify(XEvent *xevent)
               xevent->xproperty.atom, 0, 0, False, AnyPropertyType,
               &type_ret, &size_ret, &num_ret, &bytes, &prop_ret);
         XFree(prop_ret);
-        if (bytes <= 0)
+        if (type_ret == _clipboard_data_atom)
           {
-             if (_clipboard_incr_data_length)
+             printf("%s/%d: Type %s == %s\n", __FUNCTION__, __LINE__, ecore_x_atom_name_get(type_ret), ecore_x_atom_name_get(_clipboard_data_atom));
+             if (bytes <= 0)
                {
-                  /* The transaction is now finished. Th selection notify event can be sent
-                   * with all the retrieved data. */
-                  _clipboard_incr_event->data = _ecore_x_selection_parse(_clipboard_incr_event->target,
-                        _clipboard_incr_data, _clipboard_incr_data_length, size_ret);
-                  _clipboard_incr_data = NULL;
-                  _clipboard_incr_data_length = 0;
-                  _clipboard_incr_start = EINA_FALSE;
+                  if (_clipboard_incr_data_length)
+                    {
+                       /* The transaction is now finished. Th selection notify event can be sent
+                        * with all the retrieved data. */
+                       _clipboard_incr_event->data = _ecore_x_selection_parse(_clipboard_incr_event->target,
+                             _clipboard_incr_data, _clipboard_incr_data_length, size_ret);
 
-                  ecore_event_add(ECORE_X_EVENT_SELECTION_NOTIFY, _clipboard_incr_event,
-                        _ecore_x_event_free_selection_notify, NULL);
-                  ecore_x_window_prop_property_del(xevent->xproperty.window, xevent->xproperty.atom);
+                       ecore_event_add(ECORE_X_EVENT_SELECTION_NOTIFY, _clipboard_incr_event,
+                             _ecore_x_event_free_selection_notify, NULL);
+                       ecore_x_window_prop_property_del(xevent->xproperty.window, xevent->xproperty.atom);
+                       printf("%s/%d: End of image (%d)\n", __FUNCTION__, __LINE__, _clipboard_incr_data_length);
+                       _incr_data_reset(NULL);
+                    }
+                  return;
                }
+             /* Retrieval of the chunk */
+             XGetWindowProperty(_ecore_x_disp, xevent->xproperty.window,
+                   xevent->xproperty.atom, 0, bytes, False, AnyPropertyType,
+                   &type_ret, &size_ret, &num_ret, &dummy, &prop_ret);
+             bytes = num_ret * size_ret / 8;
+             _clipboard_incr_data = realloc(_clipboard_incr_data, _clipboard_incr_data_length + bytes);
+             memcpy(_clipboard_incr_data + _clipboard_incr_data_length, prop_ret, bytes);
+             printf("%s/%d: Data %.8X\n", __FUNCTION__, __LINE__, *(unsigned int *)prop_ret);
+             XFree(prop_ret);
+             _clipboard_incr_data_length += bytes;
+             /* We delete the property to indicate the owner to send the next chunk */
+             ecore_x_window_prop_property_del(xevent->xproperty.window, xevent->xproperty.atom);
+             ecore_timer_del(_clipboard_incr_timeout);
+             _clipboard_incr_timeout = ecore_timer_add(5.0, _incr_data_reset, NULL);
              return;
           }
-        /* Retrieval of the chunk */
-        XGetWindowProperty(_ecore_x_disp, xevent->xproperty.window,
-              xevent->xproperty.atom, 0, bytes, False, AnyPropertyType,
-              &type_ret, &size_ret, &num_ret, &dummy, &prop_ret);
-        bytes = num_ret * size_ret / 8;
-        _clipboard_incr_data = realloc(_clipboard_incr_data, _clipboard_incr_data_length + bytes);
-        memcpy(_clipboard_incr_data + _clipboard_incr_data_length, prop_ret, bytes);
-        XFree(prop_ret);
-        _clipboard_incr_data_length += bytes;
-        /* We delete the property to indicate the owner to send the next chunk */
-        ecore_x_window_prop_property_del(xevent->xproperty.window, xevent->xproperty.atom);
-        return;
      }
    _ecore_x_last_event_mouse_move = 0;
    {
@@ -1529,6 +1551,9 @@ _ecore_x_event_handle_selection_notify(XEvent *xevent)
    _ecore_x_last_event_mouse_move = 0;
    selection = xevent->xselection.selection;
 
+   printf("%s/%d: Target %s (%sINCR)\n", __FUNCTION__, __LINE__, ecore_x_atom_name_get(xevent->xselection.target),
+            _clipboard_incr_start?"":"No ");
+   if (_clipboard_incr_start) return;
    if (xevent->xselection.target == ECORE_X_ATOM_SELECTION_TARGETS)
      {
         format = ecore_x_window_prop_property_get(xevent->xselection.requestor,
@@ -1558,6 +1583,8 @@ _ecore_x_event_handle_selection_notify(XEvent *xevent)
                                                   &num_ret);
         if (!_clipboard_incr_start && !format) return;
      }
+   printf("%s/%d: Target %s (%sINCR)\n", __FUNCTION__, __LINE__, ecore_x_atom_name_get(xevent->xselection.target),
+            _clipboard_incr_start?"":"No ");
 
    e = calloc(1, sizeof(Ecore_X_Event_Selection_Notify));
    if (!e)
@@ -1592,7 +1619,14 @@ _ecore_x_event_handle_selection_notify(XEvent *xevent)
    else
      {
         /* In case of INCR, the event is stored until the data is ready */
-        _clipboard_incr_event = e;
+        if (!_clipboard_incr_event)
+          {
+             printf("%s/%d: Target %s Event %p %p\n", __FUNCTION__, __LINE__, e->target, _clipboard_incr_event, e);
+             _clipboard_incr_event = e;
+             _clipboard_data_atom = xevent->xselection.target;
+             _clipboard_incr_timeout = ecore_timer_add(5.0, _incr_data_reset, NULL);
+          }
+        else _ecore_x_event_free_selection_notify(NULL, e);
      }
 }
 

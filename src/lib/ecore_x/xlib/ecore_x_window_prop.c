@@ -560,8 +560,15 @@ ecore_x_window_prop_property_get(Ecore_X_Window win,
         char *atom_name = ecore_x_atom_name_get(type_ret);
         if (atom_name && !strcmp(atom_name, "INCR"))
           {
-             _clipboard_incr_start = EINA_TRUE;
-             ecore_x_window_prop_property_del(win, property);
+             if (!_clipboard_incr_start)
+               {
+                  printf("%s/%d: Target %s Size %d\n", __FUNCTION__, __LINE__, atom_name, *(unsigned int *)prop_ret);
+                  /* This packet should not be processed, as it is a INCR concurrent
+                   * to the in process INCR.
+                   */
+                  _clipboard_incr_start = EINA_TRUE;
+                  ecore_x_window_prop_property_del(win, property);
+               }
              num_ret = 0; /* Forcing early exit */
           }
         free(atom_name);

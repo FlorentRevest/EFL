@@ -393,12 +393,41 @@ ecore_x_selection_xdnd_request(Ecore_X_Window w,
    if (_ecore_xlib_sync) ecore_x_sync();
 }
 
+static Ecore_Timer *_clipboard_request_timer = NULL;
+static Ecore_Event_Handler *_clipboard_request_handler = NULL;
+static Eina_Bool
+_clipboard_timer_reset(void *data EINA_UNUSED)
+{
+   printf("%s/%d: In\n", __FUNCTION__, __LINE__);
+   _clipboard_request_timer = NULL;
+   return EINA_TRUE;
+}
+
+static Eina_Bool
+_clipboard_request_handler_cb(void *data EINA_UNUSED, int etype EINA_UNUSED, void *ev EINA_UNUSED)
+{
+   printf("%s/%d: In\n", __FUNCTION__, __LINE__);
+   ecore_event_handler_del(_clipboard_request_handler);
+   _clipboard_request_handler = NULL;
+   ecore_timer_del(_clipboard_request_timer);
+   _clipboard_request_timer = NULL;
+   return EINA_TRUE;
+}
+
 EAPI void
 ecore_x_selection_clipboard_request(Ecore_X_Window w,
                                     const char *target)
 {
    LOGFN(__FILE__, __LINE__, __FUNCTION__);
-   _ecore_x_selection_request(w, ECORE_X_ATOM_SELECTION_CLIPBOARD, target);
+   printf("%s/%d: In (%s/%p)\n", __FUNCTION__, __LINE__, target, _clipboard_request_timer);
+   if (!strcmp(target, ECORE_X_SELECTION_TARGET_TARGETS))
+      _ecore_x_selection_request(w, ECORE_X_ATOM_SELECTION_CLIPBOARD, target);
+   else if (!_clipboard_request_timer)
+     {
+        _clipboard_request_timer = ecore_timer_add(5.0, _clipboard_timer_reset, NULL);
+        _clipboard_request_handler = ecore_event_handler_add(ECORE_X_EVENT_SELECTION_NOTIFY, _clipboard_request_handler_cb, NULL);
+        _ecore_x_selection_request(w, ECORE_X_ATOM_SELECTION_CLIPBOARD, target);
+     }
 }
 
 EAPI void
