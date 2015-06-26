@@ -236,6 +236,10 @@ static void st_collections_group_limits_horizontal(void);
 static void ob_collections_group_script(void);
 static void ob_collections_group_lua_script(void);
 
+//static void ob_collections_group_filter(void);
+static void st_collections_group_filter_inline(void);
+static void st_collections_group_filter_file(void);
+
 static void st_collections_group_parts_alias(void);
 
 static Edje_Part *edje_cc_handlers_part_make(int);
@@ -4281,6 +4285,92 @@ st_collections_group_data_item(void)
      eina_hash_modify(pc->data, key, es);
    else
      eina_hash_direct_add(pc->data, key, es);
+}
+
+/** @edcsubsection{collections_group_filter,
+ *                 Group.Filter} */
+
+/**
+    @page edcref
+    @block
+        filter
+    @context
+        filter {
+            inline: "key" "Lua script here";
+            file: "key" "Lua script filename";
+            ..
+        }
+    @description
+        The "filter" block lets you embed filter scripts into an EDC group,
+        that can then be referred to in a @ref sec_collections_group_parts_description_filter "Text.Filter"
+        or @ref collections_group_parts_description_filter "Image.Filter".
+        statement.
+        This block works in a similar fashion to the @ref sec_collections_group_data "Group.Data" blocks.
+
+        Please also refer to @ref evasfiltersref "Evas filters reference".
+    @endblock
+
+    @property
+        inline
+    @parameters
+        [name] [Lua script]
+    @effect
+        Defines a new Lua script used for filtering.
+    @endproperty
+
+    @property
+        file
+    @parameters
+        [name] [Lua script filename]
+    @effect
+        Includes an external file to define a new Lua script used for filtering.
+    @endproperty
+*/
+
+static void
+//ob_collections_group_filter(void)
+st_collections_group_filter_inline(void)
+{
+   Edje_Gfx_Filter *array;
+   char *name, *script;
+   unsigned k, i;
+
+   check_arg_count(2);
+
+#warning NEED TO TEST THIS!!!
+
+   name = parse_str(0);
+   script = parse_str(1);
+
+   // ensure order so we could do binary search later on
+   // since this here happens at build time, we don't care about very hi-perf
+   for (k = 0; k < current_desc->gfx_filters_count; k++)
+     {
+        int cmp = strcmp(name, current_desc->gfx_filters[k].name);
+        if (!cmp)
+          {
+             ERR("parse error %s:%i. A filter named '%s' already exists within this block.",
+                 file_in, line - 1);
+             exit(-1);
+          }
+        else if (cmp < 0)
+          break;
+     }
+
+   array = realloc(current_desc->gfx_filters,
+                   sizeof(Edje_Gfx_Filter) * (current_desc->gfx_filters_count + 1));
+   if (!array)
+     {
+        ERR("Memory allocation failed (array grow)");
+        exit(-1);
+     }
+
+   for (i = current_desc->gfx_filters_count - 1; i >= k; i--)
+     array[i + 1] = array[i];
+
+   array[k].name = name;
+   array[k].script = script;
+   current_desc->gfx_filters_count++;
 }
 
 /** @edcsubsection{collections_group_limits,

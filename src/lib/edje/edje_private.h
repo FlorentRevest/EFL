@@ -326,6 +326,7 @@ typedef struct _Edje_Sound_Tone                      Edje_Sound_Tone;
 typedef struct _Edje_Sound_Directory                 Edje_Sound_Directory;
 typedef struct _Edje_Mo                              Edje_Mo;
 typedef struct _Edje_Mo_Directory                    Edje_Mo_Directory;
+typedef struct _Edje_Gfx_Filter                      Edje_Gfx_Filter;
 
 typedef struct _Edje_Vibration_Sample                Edje_Vibration_Sample;
 typedef struct _Edje_Vibration_Directory             Edje_Vibration_Directory;
@@ -1153,6 +1154,12 @@ struct _Edje_Part_Image_Id
    Eina_Bool set;
 };
 
+struct _Edje_Gfx_Filter
+{
+   Eina_Stringshare *name;
+   Edje_String *script;
+};
+
 struct _Edje_Part_Description_Common
 {
    struct {
@@ -1254,6 +1261,9 @@ struct _Edje_Part_Description_Common
    unsigned char     visible; /* is it shown */
    unsigned char     limit; /* 0 == no, 1 = width, 2 = height, 3 = both */
    Edje_3D_Vec       align_3d;
+
+   Edje_Gfx_Filter  *gfx_filters;
+   unsigned int      gfx_filters_count;
 };
 
 struct _Edje_Part_Description_Spec_Fill
