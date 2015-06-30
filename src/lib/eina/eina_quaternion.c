@@ -589,41 +589,6 @@ eina_quaternion_rotate(Eina_Point_3D *p,
    p->z = center->z + z + uvz + uuvz;
 }
 
-EAPI void
-eina_quaternion_rotation_matrix3_get(Eina_Matrix3 *m,
-                                     const Eina_Quaternion *q)
-{
-   double x, y, z;
-   double xx, xy, xz;
-   double yy, yz;
-   double zz;
-   double wx, wy, wz;
-
-   x = 2.0 * q->x;
-   y = 2.0 * q->y;
-   z = 2.0 * q->z;
-
-   xx = q->x * x;
-   xy = q->x * y;
-   xz = q->x * z;
-   yy = q->y * y;
-   yz = q->y * z;
-   zz = q->z * z;
-   wx = q->w * x;
-   wy = q->w * y;
-   wz = q->w * z;
-
-   m->xx = 1.0 - yy - zz;
-   m->xy = xy + wz;
-   m->xz = xz - wy;
-   m->yx = xy - wz;
-   m->yy = 1.0 - xx - zz;
-   m->yz = yz + wx;
-   m->zx = xz + wy;
-   m->zy = yz - wx;
-   m->zz = 1.0 - xx - yy;
-}
-
 static inline double
 _max(double a, double b)
 {

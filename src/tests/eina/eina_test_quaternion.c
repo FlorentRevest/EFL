@@ -96,25 +96,6 @@ START_TEST(eina_test_quaternion_conjugate)
 }
 END_TEST
 
-START_TEST(eina_test_quaternion_matrix)
-{
-   Eina_Quaternion q = { 7, 9, 5, 1 };
-   Eina_Matrix3 m = {
-     -211, 136, 52,
-     116, -147, 104,
-     88, 76, -259
-   };
-   Eina_Matrix3 tm;
-
-   eina_init();
-
-   eina_quaternion_rotation_matrix3_get(&tm, &q);
-   fail_if(!eina_matrix3_cmp(&tm, &m));
-
-   eina_shutdown();
-}
-END_TEST
-
 START_TEST(eina_test_quaternion_op)
 {
    Eina_Quaternion q = { 7, 9, 5, 1 };
@@ -208,7 +189,6 @@ eina_test_quaternion(TCase *tc)
 {
    tcase_add_test(tc, eina_test_quaternion_norm);
    tcase_add_test(tc, eina_test_quaternion_conjugate);
-   tcase_add_test(tc, eina_test_quaternion_matrix);
    tcase_add_test(tc, eina_test_quaternion_op);
    tcase_add_test(tc, eina_test_matrix_quaternion);
    tcase_add_test(tc, eina_test_matrix_recompose);

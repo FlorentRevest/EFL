@@ -125,8 +125,6 @@ EAPI void eina_quaternion_nlerp(Eina_Quaternion *out,
 EAPI void eina_quaternion_rotate(Eina_Point_3D *p,
                                  const Eina_Point_3D *center,
                                  const Eina_Quaternion *q);
-EAPI void eina_quaternion_rotation_matrix3_get(Eina_Matrix3 *m,
-                                               const Eina_Quaternion *q);
 EAPI Eina_Bool eina_matrix4_quaternion_to(Eina_Quaternion *rotation,
                                           Eina_Quaternion *perspective,
                                           Eina_Point_3D *translation,
